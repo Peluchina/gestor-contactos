@@ -12,8 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gestorcontactos.gestor_contactos.config.SecurityConfig;
 import com.gestorcontactos.gestor_contactos.controller.DashboardController;
 import com.gestorcontactos.gestor_contactos.controller.LoginController;
+import com.gestorcontactos.gestor_contactos.controller.UserAdminController;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
+import com.gestorcontactos.gestor_contactos.service.UserService;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,11 +24,13 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import java.util.List;
 
-@WebMvcTest(controllers = {LoginController.class, DashboardController.class})
+@WebMvcTest(controllers = {LoginController.class, DashboardController.class, UserAdminController.class})
 @Import(SecurityConfig.class)
 class SecurityAuthenticationTest {
 
@@ -38,6 +42,12 @@ class SecurityAuthenticationTest {
 
     @MockitoBean
     private CustomUserDetailsService userDetailsService;
+
+    @MockitoBean
+    private UserService userService;
+
+    @Autowired
+    private SessionRegistry sessionRegistry;
 
     @Test
     void validCredentialsCreateSessionAndOpenProtectedPage() throws Exception {
@@ -111,9 +121,21 @@ class SecurityAuthenticationTest {
                         details("seller", "hash", Role.VENDEDOR, true))))
                 .andExpect(status().isForbidden());
 
+        when(userService.listUsers(null)).thenReturn(List.of());
         mockMvc.perform(get("/usuarios").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
                         details("admin", "hash", Role.ADMINISTRADOR, true))))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(view().name("users/list"));
+    }
+
+    @Test
+    void administratorCanOpenUserCreationFormWithoutEchoingPasswordFields() throws Exception {
+        mockMvc.perform(get("/usuarios/nuevo").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        details("admin", "hash", Role.ADMINISTRADOR, true))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("users/create"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("password_hash"))))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("type=\"password\"")));
     }
 
     @Test
@@ -140,6 +162,24 @@ class SecurityAuthenticationTest {
     }
 
     @Test
+    void expiredRegisteredSessionCannotContinueUsingProtectedPages() throws Exception {
+        when(userDetailsService.loadUserByUsername("session-owner"))
+                .thenReturn(details("session-owner", "correct-password", Role.VENDEDOR, true, 901L));
+        MvcResult login = mockMvc.perform(post("/login").with(csrf())
+                        .param("username", "session-owner")
+                        .param("password", "correct-password"))
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+        MockHttpSession userSession = (MockHttpSession) login.getRequest().getSession(false);
+
+        new UserSessionManager(sessionRegistry).expireSessions(901L);
+
+        mockMvc.perform(get("/dashboard").session(userSession))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?expired"));
+    }
+
+    @Test
     void passwordEncoderStoresOnlyBcryptHash() {
         String rawPassword = "safe-password";
         String encodedPassword = passwordEncoder.encode(rawPassword);
@@ -151,7 +191,16 @@ class SecurityAuthenticationTest {
     }
 
     private CustomUserDetails details(String username, String rawPassword, Role role, boolean enabled) {
+        return details(username, rawPassword, role, enabled, null);
+    }
+
+    private CustomUserDetails details(String username, String rawPassword, Role role, boolean enabled, Long id) {
         return new CustomUserDetails(new User(username, passwordEncoder.encode(rawPassword), role, enabled,
-                LocalDateTime.now()));
+                LocalDateTime.now())) {
+            @Override
+            public Long getId() {
+                return id;
+            }
+        };
     }
 }

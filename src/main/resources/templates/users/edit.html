@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Editar rol | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <p><a th:href="@{/usuarios}">Volver a usuarios</a></p>
+    <h1>Editar rol</h1>
+    <p>Usuario: <strong th:text="${user.username}"></strong></p>
+    <form th:action="@{/usuarios/{id}/editar(id=${user.id})}" th:object="${form}" method="post">
+        <p th:if="${#fields.hasGlobalErrors()}" th:each="error : ${#fields.globalErrors()}" th:text="${error}" role="alert"></p>
+        <label for="role">Rol</label>
+        <select id="role" th:field="*{role}" required>
+            <option th:each="role : ${roles}" th:value="${role}" th:text="${role}"></option>
+        </select>
+        <p th:if="${#fields.hasErrors('role')}" th:errors="*{role}" role="alert"></p>
+        <button type="submit">Guardar rol</button>
+    </form>
+</main>
+</body>
+</html>

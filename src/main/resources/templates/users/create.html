@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crear usuario | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <p><a th:href="@{/usuarios}">Volver a usuarios</a></p>
+    <h1>Crear usuario</h1>
+    <form th:action="@{/usuarios}" th:object="${form}" method="post">
+        <p th:if="${#fields.hasGlobalErrors()}" th:each="error : ${#fields.globalErrors()}" th:text="${error}" role="alert"></p>
+        <label for="username">Username</label>
+        <input id="username" type="text" th:field="*{username}" minlength="4" maxlength="50" required>
+        <p th:if="${#fields.hasErrors('username')}" th:errors="*{username}" role="alert"></p>
+        <label for="password">Contraseña inicial</label>
+        <input id="password" type="password" name="password" autocomplete="new-password" required>
+        <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}" role="alert"></p>
+        <label for="role">Rol</label>
+        <select id="role" th:field="*{role}" required>
+            <option value="">Selecciona un rol</option>
+            <option th:each="role : ${roles}" th:value="${role}" th:text="${role}"></option>
+        </select>
+        <p th:if="${#fields.hasErrors('role')}" th:errors="*{role}" role="alert"></p>
+        <button type="submit">Crear</button>
+    </form>
+</main>
+</body>
+</html>

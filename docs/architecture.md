@@ -797,6 +797,19 @@ La sesión permitirá:
 
 El logout debe invalidar la sesión.
 
+Cuando una cuenta se desactive o cambie de rol, sus sesiones activas deben expirar. Para ello se utilizará el
+`SessionRegistry` en memoria de Spring Security; no se almacenarán sesiones en Redis ni en otro servicio externo.
+
+## 26.1 Administrador inicial
+
+En una base de datos sin usuarios, el primer administrador se puede crear al iniciar la aplicación mediante las
+variables de entorno `INITIAL_ADMIN_USERNAME` e `INITIAL_ADMIN_PASSWORD`. La creación solo se ejecuta si la tabla
+`users` está vacía. La contraseña se codifica con BCrypt y nunca se registra en logs. Si no hay usuarios ni valores
+configurados, la aplicación falla al iniciar con una instrucción para configurar estas variables.
+
+Estas variables deben configurarse localmente o en el entorno de ejecución y nunca guardarse con valores reales en
+archivos versionados.
+
 ---
 
 # 27. Autorización

@@ -555,6 +555,11 @@ abc
 juan perez
 ```
 
+También se probará que la administración requiera el rol `ADMINISTRADOR`, que no se pueda cambiar el propio rol
+administrador ni desactivar la propia cuenta, y que crear, editar, activar, desactivar y restablecer contraseña
+actualice la auditoría desde el usuario autenticado. Los cambios de estado y rol deben expirar las sesiones activas
+del usuario afectado.
+
 ---
 
 # 25. Contraseñas

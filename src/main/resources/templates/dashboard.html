@@ -9,6 +9,9 @@
 <main>
     <h1>Gestor de Contactos</h1>
     <p>Sesión iniciada como <span sec:authentication="name"></span>.</p>
+    <nav>
+        <a sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/usuarios}">Administrar usuarios</a>
+    </nav>
     <form th:action="@{/logout}" method="post">
         <button type="submit">Cerrar sesión</button>
     </form>

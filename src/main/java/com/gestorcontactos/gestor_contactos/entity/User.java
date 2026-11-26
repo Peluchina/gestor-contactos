@@ -52,11 +52,17 @@ public class User {
     }
 
     public User(String username, String passwordHash, Role role, boolean enabled, LocalDateTime createdAt) {
+        this(username, passwordHash, role, enabled, createdAt, null);
+    }
+
+    public User(String username, String passwordHash, Role role, boolean enabled, LocalDateTime createdAt,
+            User createdBy) {
         this.username = username;
         this.passwordHash = passwordHash;
         this.role = role;
         this.enabled = enabled;
         this.createdAt = createdAt;
+        this.createdBy = createdBy;
     }
 
     public Long getId() {
@@ -93,5 +99,25 @@ public class User {
 
     public User getUpdatedBy() {
         return updatedBy;
+    }
+
+    public void changeRole(Role role, User updatedBy, LocalDateTime updatedAt) {
+        this.role = role;
+        recordUpdate(updatedBy, updatedAt);
+    }
+
+    public void changeEnabled(boolean enabled, User updatedBy, LocalDateTime updatedAt) {
+        this.enabled = enabled;
+        recordUpdate(updatedBy, updatedAt);
+    }
+
+    public void resetPassword(String passwordHash, User updatedBy, LocalDateTime updatedAt) {
+        this.passwordHash = passwordHash;
+        recordUpdate(updatedBy, updatedAt);
+    }
+
+    private void recordUpdate(User updatedBy, LocalDateTime updatedAt) {
+        this.updatedBy = updatedBy;
+        this.updatedAt = updatedAt;
     }
 }

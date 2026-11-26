@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Usuarios | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <p><a th:href="@{/dashboard}">Volver al inicio</a></p>
+    <h1>Administración de usuarios</h1>
+    <p th:if="${success}" th:text="${success}" role="status"></p>
+    <p th:if="${error}" th:text="${error}" role="alert"></p>
+    <p><a th:href="@{/usuarios/nuevo}">Crear usuario</a></p>
+    <table>
+        <thead>
+        <tr>
+            <th>Usuario</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Creado</th>
+            <th>Creado por</th>
+            <th>Última modificación</th>
+            <th>Modificado por</th>
+            <th>Acciones</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="user : ${users}">
+            <td th:text="${user.username}"></td>
+            <td th:text="${user.role}"></td>
+            <td th:text="${user.enabled ? 'Activo' : 'Inactivo'}"></td>
+            <td th:text="${user.createdAt == null ? '—' : #temporals.format(user.createdAt, 'dd/MM/yyyy HH:mm')}"></td>
+            <td th:text="${user.createdByUsername == null ? '—' : user.createdByUsername}"></td>
+            <td th:text="${user.updatedAt == null ? '—' : #temporals.format(user.updatedAt, 'dd/MM/yyyy HH:mm')}"></td>
+            <td th:text="${user.updatedByUsername == null ? '—' : user.updatedByUsername}"></td>
+            <td>
+                <a th:href="@{/usuarios/{id}/editar(id=${user.id})}">Editar rol</a>
+                <a th:if="${user.id != currentUserId}" th:href="@{/usuarios/{id}/restablecer-contrasena(id=${user.id})}">Restablecer contraseña</a>
+                <form th:if="${user.enabled and user.id != currentUserId}" th:action="@{/usuarios/{id}/desactivar(id=${user.id})}" method="post">
+                    <button type="submit">Desactivar</button>
+                </form>
+                <form th:if="${not user.enabled}" th:action="@{/usuarios/{id}/activar(id=${user.id})}" method="post">
+                    <button type="submit">Activar</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(users)}"><td colspan="8">No hay usuarios registrados.</td></tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

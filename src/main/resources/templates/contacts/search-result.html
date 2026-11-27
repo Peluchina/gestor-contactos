@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Búsqueda de contactos | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <a th:href="@{/contactos}">Volver a contactos</a>
+    <h1>Buscar por documento</h1>
+    <form th:action="@{/contactos/buscar}" method="get">
+        <label>Tipo de documento
+            <select name="documentType" required>
+                <option value="DNI">DNI</option>
+                <option value="CARNET_EXTRANJERIA">Carnet de Extranjería</option>
+                <option value="RUC">RUC</option>
+            </select>
+        </label>
+        <label>Número <input name="documentNumber" type="text" required></label>
+        <button type="submit">Buscar</button>
+    </form>
+    <p th:if="${resultMessage}" th:text="${resultMessage}" role="status"></p>
+    <section th:if="${contact}">
+        <h2 th:text="${contact.displayName}"></h2>
+        <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
+        <p th:if="${restrictedView}">Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
+        <p th:if="${restrictedView}">Estado: <span th:text="${contact.status}"></span></p>
+        <p th:if="${restrictedView}">Relaciones: <span th:text="${contact.commercialTypes}"></span></p>
+        <p th:unless="${restrictedView}">Dirección: <span th:text="${contact.address}"></span></p>
+        <p th:unless="${restrictedView}">Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
+        <p th:unless="${restrictedView}">Estado: <span th:text="${contact.status}"></span></p>
+        <p th:unless="${restrictedView}">Relaciones: <span th:text="${contact.commercialTypes}"></span></p>
+        <a th:if="${!restrictedView}" th:href="@{/contactos/{id}(id=${contact.id})}">Consultar detalle</a>
+        <form th:if="${canAddClient and !clientAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/cliente(id=${contact.id})}" method="post">
+            <button type="submit">Agregar CLIENTE</button>
+        </form>
+        <form th:if="${canAddSupplier and !supplierAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/proveedor(id=${contact.id})}" method="post">
+            <button type="submit">Agregar PROVEEDOR</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

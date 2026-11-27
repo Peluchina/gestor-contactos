@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crear persona natural | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <h1>Crear persona natural</h1>
+    <a th:href="@{/contactos}">Volver a contactos</a>
+    <form th:action="@{/contactos/natural}" th:object="${form}" method="post">
+        <div th:if="${#fields.hasGlobalErrors()}" role="alert">
+            <p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
+        </div>
+        <label>Nombres <input type="text" th:field="*{firstNames}" required></label>
+        <label>Apellidos <input type="text" th:field="*{lastNames}" required></label>
+        <label>Tipo de documento
+            <select th:field="*{documentType}" required>
+                <option value="DNI">DNI</option>
+                <option value="CARNET_EXTRANJERIA">Carnet de Extranjería</option>
+            </select>
+        </label>
+        <label>Número de documento <input type="text" th:field="*{documentNumber}" required></label>
+        <label>Dirección <input type="text" th:field="*{address}" required></label>
+        <fieldset>
+            <legend>Teléfono</legend>
+            <label>Tipo
+                <select th:field="*{phones[0].phoneType}" required>
+                    <option value="CELULAR">Celular</option>
+                    <option value="FIJO">Fijo</option>
+                </select>
+            </label>
+            <label>Código de área <input type="text" th:field="*{phones[0].areaCode}"></label>
+            <label>Número <input type="text" th:field="*{phones[0].phoneNumber}" required></label>
+        </fieldset>
+        <label>Correo electrónico <input type="email" th:field="*{emails[0].email}" required></label>
+        <label>Relaciones comerciales
+            <select th:field="*{commercialTypes}" multiple required>
+                <option th:each="type : ${commercialTypes}" th:value="${type}" th:text="${type}"></option>
+            </select>
+        </label>
+        <button type="submit">Crear contacto</button>
+    </form>
+</main>
+</body>
+</html>

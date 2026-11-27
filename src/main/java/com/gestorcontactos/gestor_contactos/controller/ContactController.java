@@ -1,0 +1,321 @@
+package com.gestorcontactos.gestor_contactos.controller;
+
+import com.gestorcontactos.gestor_contactos.dto.ContactDetailsView;
+import com.gestorcontactos.gestor_contactos.dto.ContactIdentityLookupView;
+import com.gestorcontactos.gestor_contactos.dto.ContactListItem;
+import com.gestorcontactos.gestor_contactos.dto.ContactPhoneView;
+import com.gestorcontactos.gestor_contactos.dto.CreateContactEmailRequest;
+import com.gestorcontactos.gestor_contactos.dto.CreateContactPhoneRequest;
+import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.WarehouseContactDetailsView;
+import com.gestorcontactos.gestor_contactos.dto.WarehouseContactListItem;
+import com.gestorcontactos.gestor_contactos.entity.CommercialType;
+import com.gestorcontactos.gestor_contactos.entity.Contact;
+import com.gestorcontactos.gestor_contactos.entity.ContactStatus;
+import com.gestorcontactos.gestor_contactos.entity.DocumentType;
+import com.gestorcontactos.gestor_contactos.entity.PersonType;
+import com.gestorcontactos.gestor_contactos.entity.PhoneType;
+import com.gestorcontactos.gestor_contactos.entity.Role;
+import com.gestorcontactos.gestor_contactos.entity.User;
+import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
+import com.gestorcontactos.gestor_contactos.security.CustomUserDetails;
+import com.gestorcontactos.gestor_contactos.service.ContactService;
+import com.gestorcontactos.gestor_contactos.service.UserService;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+@Controller
+public class ContactController {
+
+    private final ContactService contactService;
+    private final UserService userService;
+
+    public ContactController(ContactService contactService, UserService userService) {
+        this.contactService = contactService;
+        this.userService = userService;
+    }
+
+    @GetMapping("/contactos")
+    public String listContacts(@AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
+        User actor = authenticatedUser(currentUser);
+        if (actor.getRole() == Role.ALMACENERO) {
+            List<WarehouseContactListItem> contacts = warehouseContacts();
+            model.addAttribute("contacts", contacts);
+            model.addAttribute("restrictedView", true);
+        } else {
+            List<Contact> contacts = contactsForRole(actor.getRole());
+            model.addAttribute("contacts", contacts.stream().map(this::toListItem).toList());
+            model.addAttribute("restrictedView", false);
+        }
+        model.addAttribute("canSearch", actor.getRole() != Role.ALMACENERO);
+        model.addAttribute("canCreateNatural", actor.getRole() == Role.ADMINISTRADOR || actor.getRole() == Role.VENDEDOR);
+        model.addAttribute("canCreateLegal", actor.getRole() == Role.ADMINISTRADOR || actor.getRole() == Role.COMPRAS);
+        return "contacts/list";
+    }
+
+    @GetMapping("/contactos/nuevo/natural")
+    public String naturalContactForm(@AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
+        User actor = authenticatedUser(currentUser);
+        model.addAttribute("form", emptyNaturalRequest());
+        addAllowedCommercialTypes(model, actor.getRole());
+        return "contacts/create-natural";
+    }
+
+    @PostMapping("/contactos/natural")
+    public String createNaturalContact(@ModelAttribute("form") CreateNaturalContactRequest form,
+            BindingResult bindingResult, @AuthenticationPrincipal CustomUserDetails currentUser,
+            Model model, RedirectAttributes redirectAttributes) {
+        User actor = authenticatedUser(currentUser);
+        if (bindingResult.hasErrors()) {
+            addAllowedCommercialTypes(model, actor.getRole());
+            return "contacts/create-natural";
+        }
+        try {
+            Contact contact = contactService.createNaturalContact(form, actor);
+            redirectAttributes.addFlashAttribute("success", "Contacto creado correctamente.");
+            return "redirect:/contactos/" + contact.getId();
+        } catch (ContactBusinessException exception) {
+            bindingResult.reject("contactBusiness", exception.getMessage());
+            addAllowedCommercialTypes(model, actor.getRole());
+            return "contacts/create-natural";
+        }
+    }
+
+    @GetMapping("/contactos/nuevo/juridica")
+    public String legalContactForm(@AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
+        User actor = authenticatedUser(currentUser);
+        model.addAttribute("form", emptyLegalRequest());
+        addAllowedCommercialTypes(model, actor.getRole());
+        return "contacts/create-legal";
+    }
+
+    @PostMapping("/contactos/juridica")
+    public String createLegalContact(@ModelAttribute("form") CreateLegalContactRequest form,
+            BindingResult bindingResult, @AuthenticationPrincipal CustomUserDetails currentUser,
+            Model model, RedirectAttributes redirectAttributes) {
+        User actor = authenticatedUser(currentUser);
+        if (bindingResult.hasErrors()) {
+            addAllowedCommercialTypes(model, actor.getRole());
+            return "contacts/create-legal";
+        }
+        try {
+            Contact contact = contactService.createLegalContact(form, actor);
+            redirectAttributes.addFlashAttribute("success", "Contacto creado correctamente.");
+            return "redirect:/contactos/" + contact.getId();
+        } catch (ContactBusinessException exception) {
+            bindingResult.reject("contactBusiness", exception.getMessage());
+            addAllowedCommercialTypes(model, actor.getRole());
+            return "contacts/create-legal";
+        }
+    }
+
+    @GetMapping("/contactos/buscar")
+    public String findByDocument(@RequestParam(required = false) DocumentType documentType,
+            @RequestParam(required = false) String documentNumber,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            Model model) {
+        User actor = authenticatedUser(currentUser);
+        if (documentType == null || documentNumber == null || documentNumber.isBlank()) {
+            return "contacts/search-result";
+        }
+        Optional<Contact> result = contactService.findByIdentity(documentType, documentNumber);
+        if (result.isEmpty()) {
+            model.addAttribute("resultMessage", "No se encontró un contacto con el documento indicado.");
+            return "contacts/search-result";
+        }
+
+        Contact contact = result.get();
+        if (contact.getDeletedAt() != null) {
+            model.addAttribute("resultMessage",
+                    "La identidad ya está registrada y no se puede crear un contacto duplicado.");
+            return "contacts/search-result";
+        }
+        if (actor.getRole() == Role.ADMINISTRADOR) {
+            model.addAttribute("contact", toDetailsView(contact));
+            model.addAttribute("restrictedView", false);
+        } else {
+            model.addAttribute("contact", toIdentityLookupView(contact));
+            model.addAttribute("restrictedView", true);
+        }
+        addRelationActions(model, actor.getRole(), contact);
+        return "contacts/search-result";
+    }
+
+    @GetMapping("/contactos/{id}")
+    public String contactDetails(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
+        User actor = authenticatedUser(currentUser);
+        Contact contact = contactService.findById(id)
+                .filter(found -> found.getDeletedAt() == null)
+                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+        requireReadPermission(actor.getRole(), contact);
+        if (actor.getRole() == Role.ALMACENERO) {
+            model.addAttribute("contact", toWarehouseDetails(contact));
+            model.addAttribute("restrictedView", true);
+        } else {
+            model.addAttribute("contact", toDetailsView(contact));
+            model.addAttribute("restrictedView", false);
+            addRelationActions(model, actor.getRole(), contact);
+        }
+        return "contacts/detail";
+    }
+
+    @PostMapping("/contactos/{id}/relaciones/cliente")
+    public String addClientRelation(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return addCommercialRelation(id, CommercialType.CLIENTE, currentUser, redirectAttributes);
+    }
+
+    @PostMapping("/contactos/{id}/relaciones/proveedor")
+    public String addSupplierRelation(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return addCommercialRelation(id, CommercialType.PROVEEDOR, currentUser, redirectAttributes);
+    }
+
+    private String addCommercialRelation(Long id, CommercialType commercialType,
+            CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        try {
+            contactService.addCommercialType(id, commercialType, authenticatedUser(currentUser));
+            redirectAttributes.addFlashAttribute("success", "Relación comercial agregada correctamente.");
+        } catch (ContactBusinessException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/contactos";
+    }
+
+    private User authenticatedUser(CustomUserDetails currentUser) {
+        if (currentUser == null) {
+            throw new AccessDeniedException("Se requiere autenticación.");
+        }
+        return userService.findByUsername(currentUser.getUsername())
+                .filter(User::isEnabled)
+                .orElseThrow(() -> new AccessDeniedException("La sesión no corresponde a un usuario habilitado."));
+    }
+
+    private List<Contact> contactsForRole(Role role) {
+        return switch (role) {
+            case ADMINISTRADOR -> contactService.findAllNotDeleted();
+            case VENDEDOR -> activeContactsFor(CommercialType.CLIENTE);
+            case COMPRAS -> activeContactsFor(CommercialType.PROVEEDOR);
+            case ALMACENERO -> List.of();
+        };
+    }
+
+    private List<Contact> activeContactsFor(CommercialType commercialType) {
+        return contactService.findAllNotDeletedByCommercialType(commercialType).stream()
+                .filter(contact -> contact.getStatus() == ContactStatus.ACTIVO)
+                .toList();
+    }
+
+    private List<WarehouseContactListItem> warehouseContacts() {
+        Map<Long, Contact> contacts = new LinkedHashMap<>();
+        Stream.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR)
+                .flatMap(type -> contactService.findAllNotDeletedByCommercialType(type).stream())
+                .filter(contact -> contact.getStatus() == ContactStatus.ACTIVO)
+                .forEach(contact -> contacts.putIfAbsent(contact.getId(), contact));
+        return contacts.values().stream().map(this::toWarehouseListItem).toList();
+    }
+
+    private void requireReadPermission(Role role, Contact contact) {
+        if (role == Role.ADMINISTRADOR) {
+            return;
+        }
+        if (contact.getStatus() != ContactStatus.ACTIVO) {
+            throw new AccessDeniedException("No tiene permiso para consultar este contacto.");
+        }
+        boolean allowed = switch (role) {
+            case VENDEDOR -> contact.getCommercialTypes().contains(CommercialType.CLIENTE);
+            case COMPRAS -> contact.getCommercialTypes().contains(CommercialType.PROVEEDOR);
+            case ALMACENERO -> !contact.getCommercialTypes().isEmpty();
+            case ADMINISTRADOR -> true;
+        };
+        if (!allowed) {
+            throw new AccessDeniedException("No tiene permiso para consultar este contacto.");
+        }
+    }
+
+    private void addRelationActions(Model model, Role role, Contact contact) {
+        Set<CommercialType> existingTypes = contact.getCommercialTypes();
+        model.addAttribute("canAddClient", role == Role.ADMINISTRADOR || role == Role.VENDEDOR);
+        model.addAttribute("canAddSupplier", role == Role.ADMINISTRADOR || role == Role.COMPRAS);
+        model.addAttribute("clientAlreadyAssigned", existingTypes.contains(CommercialType.CLIENTE));
+        model.addAttribute("supplierAlreadyAssigned", existingTypes.contains(CommercialType.PROVEEDOR));
+    }
+
+    private ContactListItem toListItem(Contact contact) {
+        return new ContactListItem(contact.getId(), contact.getPersonType(), displayName(contact),
+                contact.getDocumentType(), contact.getDocumentNumber(), contact.getAddress(), contact.getStatus(),
+                Set.copyOf(contact.getCommercialTypes()));
+    }
+
+    private WarehouseContactListItem toWarehouseListItem(Contact contact) {
+        return new WarehouseContactListItem(contact.getId(), contact.getPersonType(), displayName(contact),
+                contact.getAddress());
+    }
+
+    private ContactDetailsView toDetailsView(Contact contact) {
+        List<ContactPhoneView> phones = contact.getPhones().stream()
+                .map(phone -> new ContactPhoneView(phone.getPhoneType(), phone.getAreaCode(), phone.getPhoneNumber()))
+                .toList();
+        List<String> emails = contact.getEmails().stream().map(email -> email.getEmail()).toList();
+        return new ContactDetailsView(contact.getId(), contact.getPersonType(), displayName(contact),
+                contact.getDocumentType(), contact.getDocumentNumber(), contact.getAddress(), contact.getStatus(),
+                Set.copyOf(contact.getCommercialTypes()), phones, emails);
+    }
+
+    private WarehouseContactDetailsView toWarehouseDetails(Contact contact) {
+        return new WarehouseContactDetailsView(contact.getId(), contact.getPersonType(), displayName(contact),
+                contact.getAddress());
+    }
+
+    private ContactIdentityLookupView toIdentityLookupView(Contact contact) {
+        return new ContactIdentityLookupView(contact.getId(), contact.getPersonType(), displayName(contact),
+                contact.getDocumentType(), contact.getDocumentNumber(), contact.getStatus(),
+                Set.copyOf(contact.getCommercialTypes()));
+    }
+
+    private String displayName(Contact contact) {
+        return contact.getPersonType() == PersonType.NATURAL
+                ? contact.getFirstNames() + " " + contact.getLastNames()
+                : contact.getLegalName();
+    }
+
+    private void addAllowedCommercialTypes(Model model, Role role) {
+        List<CommercialType> types = switch (role) {
+            case ADMINISTRADOR -> Arrays.asList(CommercialType.values());
+            case VENDEDOR -> List.of(CommercialType.CLIENTE);
+            case COMPRAS -> List.of(CommercialType.PROVEEDOR);
+            case ALMACENERO -> List.of();
+        };
+        model.addAttribute("commercialTypes", types);
+    }
+
+    private CreateNaturalContactRequest emptyNaturalRequest() {
+        return new CreateNaturalContactRequest("", "", DocumentType.DNI, "", "",
+                List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "")),
+                List.of(new CreateContactEmailRequest("")), Set.of(CommercialType.CLIENTE));
+    }
+
+    private CreateLegalContactRequest emptyLegalRequest() {
+        return new CreateLegalContactRequest("", DocumentType.RUC, "", "",
+                List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "")),
+                List.of(new CreateContactEmailRequest("")), Set.of(CommercialType.PROVEEDOR));
+    }
+}

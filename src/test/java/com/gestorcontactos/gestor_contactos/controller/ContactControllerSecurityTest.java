@@ -1,0 +1,306 @@
+package com.gestorcontactos.gestor_contactos.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+
+import com.gestorcontactos.gestor_contactos.config.SecurityConfig;
+import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.entity.CommercialType;
+import com.gestorcontactos.gestor_contactos.entity.Contact;
+import com.gestorcontactos.gestor_contactos.entity.DocumentType;
+import com.gestorcontactos.gestor_contactos.entity.PersonType;
+import com.gestorcontactos.gestor_contactos.entity.Role;
+import com.gestorcontactos.gestor_contactos.entity.User;
+import com.gestorcontactos.gestor_contactos.security.CustomUserDetails;
+import com.gestorcontactos.gestor_contactos.security.CustomUserDetailsService;
+import com.gestorcontactos.gestor_contactos.service.ContactService;
+import com.gestorcontactos.gestor_contactos.service.UserService;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(ContactController.class)
+@Import(SecurityConfig.class)
+class ContactControllerSecurityTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private ContactService contactService;
+
+    @MockitoBean
+    private UserService userService;
+
+    @MockitoBean
+    private CustomUserDetailsService userDetailsService;
+
+    @Test
+    void unauthenticatedUserCannotOpenContactPages() throws Exception {
+        mockMvc.perform(get("/contactos"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void administratorCanCreateNaturalAndLegalContacts() throws Exception {
+        User admin = actor("admin", Role.ADMINISTRADOR);
+        mockNaturalCreation(admin, Set.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR));
+        mockLegalCreation(admin, Set.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR));
+
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(admin))).with(csrf())
+                        .params(validNaturalParameters()).param("commercialTypes", "CLIENTE", "PROVEEDOR"))
+                .andExpect(status().is3xxRedirection());
+        mockMvc.perform(post("/contactos/juridica").with(user(new CustomUserDetails(admin))).with(csrf())
+                        .params(validLegalParameters()).param("commercialTypes", "CLIENTE", "PROVEEDOR"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(contactService).createNaturalContact(any(CreateNaturalContactRequest.class), eq(admin));
+        verify(contactService).createLegalContact(any(CreateLegalContactRequest.class), eq(admin));
+    }
+
+    @Test
+    void sellerCanCreateClientButCannotCreateSupplier() throws Exception {
+        User seller = actor("seller", Role.VENDEDOR);
+        mockNaturalCreation(seller, Set.of(CommercialType.CLIENTE));
+
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller))).with(csrf())
+                        .params(validNaturalParameters()).param("commercialTypes", "CLIENTE"))
+                .andExpect(status().is3xxRedirection());
+        mockMvc.perform(post("/contactos/juridica").with(user(new CustomUserDetails(seller))).with(csrf())
+                        .params(validLegalParameters()).param("commercialTypes", "PROVEEDOR"))
+                .andExpect(status().isForbidden());
+
+        verify(contactService).createNaturalContact(any(CreateNaturalContactRequest.class), eq(seller));
+        verify(contactService, never()).createLegalContact(any(CreateLegalContactRequest.class), any(User.class));
+    }
+
+    @Test
+    void purchasingCanCreateSupplierButCannotCreateClient() throws Exception {
+        User buyer = actor("buyer", Role.COMPRAS);
+        mockLegalCreation(buyer, Set.of(CommercialType.PROVEEDOR));
+
+        mockMvc.perform(post("/contactos/juridica").with(user(new CustomUserDetails(buyer))).with(csrf())
+                        .params(validLegalParameters()).param("commercialTypes", "PROVEEDOR"))
+                .andExpect(status().is3xxRedirection());
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(buyer))).with(csrf())
+                        .params(validNaturalParameters()).param("commercialTypes", "CLIENTE"))
+                .andExpect(status().isForbidden());
+
+        verify(contactService).createLegalContact(any(CreateLegalContactRequest.class), eq(buyer));
+        verify(contactService, never()).createNaturalContact(any(CreateNaturalContactRequest.class), any(User.class));
+    }
+
+    @Test
+    void warehouseRoleCannotOpenCreationFormsOrPostCreation() throws Exception {
+        User warehouse = actor("warehouse", Role.ALMACENERO);
+
+        mockMvc.perform(get("/contactos/nuevo/natural").with(user(new CustomUserDetails(warehouse))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/contactos/nuevo/juridica").with(user(new CustomUserDetails(warehouse))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(warehouse))).with(csrf())
+                        .params(validNaturalParameters()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/contactos/juridica").with(user(new CustomUserDetails(warehouse))).with(csrf())
+                        .params(validLegalParameters()))
+                .andExpect(status().isForbidden());
+
+        verify(contactService, never()).createNaturalContact(any(CreateNaturalContactRequest.class), any(User.class));
+        verify(contactService, never()).createLegalContact(any(CreateLegalContactRequest.class), any(User.class));
+    }
+
+    @Test
+    void sellerCanAddClientButCannotAddSupplier() throws Exception {
+        User seller = actor("seller", Role.VENDEDOR);
+        mockMvc.perform(post("/contactos/41/relaciones/cliente").with(user(new CustomUserDetails(seller))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos"));
+        mockMvc.perform(post("/contactos/41/relaciones/proveedor")
+                        .with(user(new CustomUserDetails(seller))).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(contactService).addCommercialType(41L, CommercialType.CLIENTE, seller);
+        verify(contactService, never()).addCommercialType(41L, CommercialType.PROVEEDOR, seller);
+    }
+
+    @Test
+    void purchasingCanAddSupplierButCannotAddClient() throws Exception {
+        User buyer = actor("buyer", Role.COMPRAS);
+        mockMvc.perform(post("/contactos/42/relaciones/proveedor").with(user(new CustomUserDetails(buyer))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos"));
+        mockMvc.perform(post("/contactos/42/relaciones/cliente")
+                        .with(user(new CustomUserDetails(buyer))).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(contactService).addCommercialType(42L, CommercialType.PROVEEDOR, buyer);
+        verify(contactService, never()).addCommercialType(42L, CommercialType.CLIENTE, buyer);
+    }
+
+    @Test
+    void administratorCanAddEitherCommercialRelation() throws Exception {
+        User admin = actor("admin", Role.ADMINISTRADOR);
+
+        mockMvc.perform(post("/contactos/44/relaciones/cliente").with(user(new CustomUserDetails(admin))).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+        mockMvc.perform(post("/contactos/44/relaciones/proveedor")
+                        .with(user(new CustomUserDetails(admin))).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+
+        verify(contactService).addCommercialType(44L, CommercialType.CLIENTE, admin);
+        verify(contactService).addCommercialType(44L, CommercialType.PROVEEDOR, admin);
+    }
+
+    @Test
+    void warehouseRoleCannotAddEitherCommercialRelation() throws Exception {
+        User warehouse = actor("warehouse", Role.ALMACENERO);
+        mockMvc.perform(post("/contactos/43/relaciones/cliente")
+                        .with(user(new CustomUserDetails(warehouse))).with(csrf()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/contactos/43/relaciones/proveedor")
+                        .with(user(new CustomUserDetails(warehouse))).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(contactService, never()).addCommercialType(eq(43L), any(CommercialType.class), any(User.class));
+    }
+
+    @Test
+    void contactFormsIncludeCsrfAndPostRejectsMissingToken() throws Exception {
+        User seller = actor("seller", Role.VENDEDOR);
+
+        mockMvc.perform(get("/contactos/nuevo/natural").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contacts/create-natural"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")));
+
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller)))
+                        .params(validNaturalParameters()).param("commercialTypes", "CLIENTE"))
+                .andExpect(status().isForbidden());
+        verify(contactService, never()).createNaturalContact(any(CreateNaturalContactRequest.class), any(User.class));
+    }
+
+    @Test
+    void formCannotSpoofTheCreatorOrRole() throws Exception {
+        User seller = actor("seller", Role.VENDEDOR);
+        mockNaturalCreation(seller, Set.of(CommercialType.CLIENTE));
+
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller))).with(csrf())
+                        .params(validNaturalParameters())
+                        .param("commercialTypes", "CLIENTE")
+                        .param("createdBy", "999")
+                        .param("role", "ADMINISTRADOR"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(contactService).createNaturalContact(any(CreateNaturalContactRequest.class), eq(seller));
+    }
+
+    @Test
+    void warehouseListDoesNotRenderDocumentPhonesOrEmails() throws Exception {
+        User warehouse = actor("warehouse", Role.ALMACENERO);
+        Contact contact = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), warehouse);
+        contact.addCommercialType(CommercialType.CLIENTE);
+        when(contactService.findAllNotDeletedByCommercialType(CommercialType.CLIENTE)).thenReturn(java.util.List.of(contact));
+        when(contactService.findAllNotDeletedByCommercialType(CommercialType.PROVEEDOR)).thenReturn(java.util.List.of());
+
+        mockMvc.perform(get("/contactos").with(user(new CustomUserDetails(warehouse))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contacts/list"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("María Pérez")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Av. Perú 123")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("12345678"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Documento"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Teléfonos"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Correos"))));
+    }
+
+    @Test
+    void roleSpecificContactListUsesOnlyAllowedCommercialType() throws Exception {
+        User seller = actor("seller", Role.VENDEDOR);
+        when(contactService.findAllNotDeletedByCommercialType(CommercialType.CLIENTE)).thenReturn(java.util.List.of());
+
+        mockMvc.perform(get("/contactos").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contacts/list"));
+
+        verify(contactService).findAllNotDeletedByCommercialType(CommercialType.CLIENTE);
+        verify(contactService, never()).findAllNotDeletedByCommercialType(CommercialType.PROVEEDOR);
+    }
+
+    private void mockNaturalCreation(User actor, Set<CommercialType> commercialTypes) {
+        when(userService.findByUsername(actor.getUsername())).thenReturn(Optional.of(actor));
+        Contact created = org.mockito.Mockito.mock(Contact.class);
+        when(created.getId()).thenReturn(100L);
+        when(contactService.createNaturalContact(any(CreateNaturalContactRequest.class), eq(actor)))
+                .thenAnswer(invocation -> {
+                    CreateNaturalContactRequest request = invocation.getArgument(0);
+                    assertEquals(commercialTypes, request.commercialTypes());
+                    return created;
+                });
+    }
+
+    private void mockLegalCreation(User actor, Set<CommercialType> commercialTypes) {
+        when(userService.findByUsername(actor.getUsername())).thenReturn(Optional.of(actor));
+        Contact created = org.mockito.Mockito.mock(Contact.class);
+        when(created.getId()).thenReturn(101L);
+        when(contactService.createLegalContact(any(CreateLegalContactRequest.class), eq(actor)))
+                .thenAnswer(invocation -> {
+                    CreateLegalContactRequest request = invocation.getArgument(0);
+                    assertEquals(commercialTypes, request.commercialTypes());
+                    return created;
+                });
+    }
+
+    private User actor(String username, Role role) {
+        User actor = new User(username, "hash", role, true, LocalDateTime.now());
+        when(userService.findByUsername(username)).thenReturn(Optional.of(actor));
+        return actor;
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validNaturalParameters() {
+        org.springframework.util.LinkedMultiValueMap<String, String> params = new org.springframework.util.LinkedMultiValueMap<>();
+        params.add("firstNames", "María");
+        params.add("lastNames", "Pérez");
+        params.add("documentType", "DNI");
+        params.add("documentNumber", "12345678");
+        params.add("address", "Av. Perú 123");
+        params.add("phones[0].phoneType", "CELULAR");
+        params.add("phones[0].areaCode", "");
+        params.add("phones[0].phoneNumber", "987654321");
+        params.add("emails[0].email", "maria@example.com");
+        return params;
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validLegalParameters() {
+        org.springframework.util.LinkedMultiValueMap<String, String> params = new org.springframework.util.LinkedMultiValueMap<>();
+        params.add("legalName", "Empresa 123 S.A.C.");
+        params.add("documentType", "RUC");
+        params.add("documentNumber", "20123456789");
+        params.add("address", "Av. Perú 123");
+        params.add("phones[0].phoneType", "CELULAR");
+        params.add("phones[0].areaCode", "");
+        params.add("phones[0].phoneNumber", "987654321");
+        params.add("emails[0].email", "empresa@example.com");
+        return params;
+    }
+}

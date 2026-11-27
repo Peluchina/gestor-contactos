@@ -3,6 +3,7 @@ package com.gestorcontactos.gestor_contactos.config;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetailsService;
 import java.time.Clock;
 import java.time.ZoneId;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -25,6 +26,22 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
                         .requestMatchers("/admin/**", "/usuarios/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/contactos/nuevo/natural")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR")
+                        .requestMatchers(HttpMethod.POST, "/contactos/natural")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR")
+                        .requestMatchers(HttpMethod.GET, "/contactos/nuevo/juridica")
+                                .hasAnyRole("ADMINISTRADOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST, "/contactos/juridica")
+                                .hasAnyRole("ADMINISTRADOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.GET, "/contactos/buscar")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/cliente")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR")
+                        .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/proveedor")
+                                .hasAnyRole("ADMINISTRADOR", "COMPRAS")
+                        .requestMatchers("/contactos/**")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS", "ALMACENERO")
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")

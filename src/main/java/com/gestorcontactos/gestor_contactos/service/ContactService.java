@@ -10,7 +10,6 @@ import com.gestorcontactos.gestor_contactos.entity.ContactEmail;
 import com.gestorcontactos.gestor_contactos.entity.ContactPhone;
 import com.gestorcontactos.gestor_contactos.entity.DocumentType;
 import com.gestorcontactos.gestor_contactos.entity.PersonType;
-import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;

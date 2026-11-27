@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contactos | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <h1>Contactos</h1>
+    <p th:if="${success}" th:text="${success}" role="status"></p>
+    <p th:if="${error}" th:text="${error}" role="alert"></p>
+    <nav>
+        <a th:if="${canCreateNatural}" th:href="@{/contactos/nuevo/natural}">Crear persona natural</a>
+        <a th:if="${canCreateLegal}" th:href="@{/contactos/nuevo/juridica}">Crear persona jurídica</a>
+        <a th:if="${canSearch}" th:href="@{/contactos/buscar}">Buscar por documento</a>
+        <a th:href="@{/dashboard}">Inicio</a>
+    </nav>
+    <table>
+        <thead>
+        <tr><th>Tipo</th><th>Nombre</th><th>Dirección</th><th th:unless="${restrictedView}">Documento</th>
+            <th th:unless="${restrictedView}">Estado</th><th>Detalle</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="contact : ${contacts}">
+            <td th:text="${contact.personType}"></td>
+            <td th:text="${contact.displayName}"></td>
+            <td th:text="${contact.address}"></td>
+            <td th:unless="${restrictedView}"
+                th:text="${contact.documentType + ' ' + contact.documentNumber}"></td>
+            <td th:unless="${restrictedView}" th:text="${contact.status}"></td>
+            <td><a th:href="@{/contactos/{id}(id=${contact.id})}">Consultar</a></td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(contacts)}"><td colspan="6">No hay contactos para mostrar.</td></tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

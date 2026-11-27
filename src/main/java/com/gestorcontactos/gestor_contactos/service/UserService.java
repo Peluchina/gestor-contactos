@@ -6,7 +6,9 @@ import com.gestorcontactos.gestor_contactos.dto.ResetPasswordRequest;
 import com.gestorcontactos.gestor_contactos.dto.UserListItem;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
+import com.gestorcontactos.gestor_contactos.exception.UserConflictException;
 import com.gestorcontactos.gestor_contactos.exception.UserManagementException;
+import com.gestorcontactos.gestor_contactos.exception.UserNotFoundException;
 import com.gestorcontactos.gestor_contactos.repository.UserRepository;
 import com.gestorcontactos.gestor_contactos.security.UserSessionManager;
 import java.time.Clock;
@@ -64,7 +66,7 @@ public class UserService {
             throw new UserManagementException("Selecciona un rol válido.");
         }
         if (userRepository.existsByUsernameIgnoreCase(request.getUsername())) {
-            throw new UserManagementException(USERNAME_DUPLICATE);
+            throw new UserConflictException(USERNAME_DUPLICATE);
         }
 
         User user = new User(request.getUsername(), passwordEncoder.encode(request.getPassword()), request.getRole(),
@@ -72,7 +74,7 @@ public class UserService {
         try {
             return toListItem(userRepository.saveAndFlush(user));
         } catch (DataIntegrityViolationException exception) {
-            throw new UserManagementException(USERNAME_DUPLICATE);
+            throw new UserConflictException(USERNAME_DUPLICATE);
         }
     }
 
@@ -155,7 +157,7 @@ public class UserService {
 
     private User findUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new UserManagementException("No se encontró el usuario solicitado."));
+                .orElseThrow(() -> new UserNotFoundException("No se encontró el usuario solicitado."));
     }
 
     private UserListItem toListItem(User user) {

@@ -22,6 +22,7 @@ import com.gestorcontactos.gestor_contactos.entity.PhoneType;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
+import com.gestorcontactos.gestor_contactos.exception.ContactConflictException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactPhotoValidator;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
@@ -167,7 +168,7 @@ class ContactPhotoStorageServiceTest {
         when(contactRepository.saveAndFlush(contact))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("database failure"));
 
-        assertThrows(ContactBusinessException.class, () -> contactService.replacePhoto(21L,
+        assertThrows(ContactConflictException.class, () -> contactService.replacePhoto(21L,
                 upload("new.png", "image/png", image("png", 8, 5)), administrator));
 
         assertEquals(oldPath, contact.getPhotoPath());

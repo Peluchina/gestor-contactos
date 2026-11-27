@@ -31,6 +31,8 @@ import com.gestorcontactos.gestor_contactos.entity.PhoneType;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
+import com.gestorcontactos.gestor_contactos.exception.ContactConflictException;
+import com.gestorcontactos.gestor_contactos.exception.ContactNotFoundException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetails;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetailsService;
@@ -74,6 +76,29 @@ class ContactControllerSecurityTest {
         mockMvc.perform(get("/contactos"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void missingContactDetailsReturn404() throws Exception {
+        User seller = actor("missing-contact", Role.VENDEDOR);
+        when(userService.findByUsername(seller.getUsername())).thenReturn(Optional.of(seller));
+        when(contactService.findById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/contactos/999").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("error/404"));
+    }
+
+    @Test
+    void contactIdentityConflictReturns409() throws Exception {
+        User seller = actor("contact-conflict", Role.VENDEDOR);
+        when(contactService.createNaturalContact(any(CreateNaturalContactRequest.class), eq(seller)))
+                .thenThrow(new ContactConflictException("internal duplicate details"));
+
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller))).with(csrf())
+                        .params(validNaturalParameters()).param("commercialTypes", "CLIENTE"))
+                .andExpect(status().isConflict())
+                .andExpect(view().name("error/409"));
     }
 
     @Test

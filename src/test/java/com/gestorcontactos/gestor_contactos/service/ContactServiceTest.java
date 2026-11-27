@@ -25,6 +25,8 @@ import com.gestorcontactos.gestor_contactos.entity.PhoneType;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
+import com.gestorcontactos.gestor_contactos.exception.ContactConflictException;
+import com.gestorcontactos.gestor_contactos.exception.ContactNotFoundException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
 import java.time.LocalDateTime;
@@ -227,7 +229,7 @@ class ContactServiceTest {
         when(contactRepository.findByDocumentTypeAndDocumentNumber(DocumentType.DNI, "12345678"))
                 .thenReturn(Optional.of(existingContact(administrator)));
 
-        ContactBusinessException exception = assertThrows(ContactBusinessException.class,
+        ContactConflictException exception = assertThrows(ContactConflictException.class,
                 () -> contactService.createNaturalContact(validNaturalRequest(), administrator));
 
         assertEquals("Ya existe un contacto con el documento indicado.", exception.getMessage());
@@ -241,18 +243,18 @@ class ContactServiceTest {
         when(contactRepository.findByDocumentTypeAndDocumentNumber(DocumentType.DNI, "12345678"))
                 .thenReturn(Optional.of(deleted));
 
-        assertThrows(ContactBusinessException.class,
+        assertThrows(ContactConflictException.class,
                 () -> contactService.createNaturalContact(validNaturalRequest(), administrator));
         verify(contactRepository, never()).saveAndFlush(any(Contact.class));
     }
 
     @Test
-    void translatesDatabaseIntegrityConflictsToBusinessException() {
+    void translatesDatabaseIntegrityConflictsToContactConflictException() {
         allowNewIdentity(DocumentType.DNI, "12345678");
         when(contactRepository.saveAndFlush(any(Contact.class)))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("database detail"));
 
-        ContactBusinessException exception = assertThrows(ContactBusinessException.class,
+        ContactConflictException exception = assertThrows(ContactConflictException.class,
                 () -> contactService.createNaturalContact(validNaturalRequest(), administrator));
 
         assertEquals("No se pudo crear el contacto porque existe un conflicto con los datos registrados.",
@@ -331,7 +333,7 @@ class ContactServiceTest {
         Contact contact = existingContactWithType(CommercialType.CLIENTE);
         when(contactRepository.findById(contactId)).thenReturn(Optional.of(contact));
 
-        ContactBusinessException exception = assertThrows(ContactBusinessException.class,
+        ContactConflictException exception = assertThrows(ContactConflictException.class,
                 () -> contactService.addCommercialType(contactId, CommercialType.CLIENTE, administrator));
 
         assertEquals("El contacto ya tiene asignada esa relación comercial.", exception.getMessage());
@@ -470,7 +472,7 @@ class ContactServiceTest {
         when(contactRepository.findById(104L)).thenReturn(Optional.empty());
         when(contactRepository.findById(105L)).thenReturn(Optional.of(deleted));
 
-        assertThrows(ContactBusinessException.class,
+        assertThrows(ContactNotFoundException.class,
                 () -> contactService.changeStatus(104L, "INACTIVO", administrator));
         assertThrows(ContactBusinessException.class,
                 () -> contactService.changeStatus(105L, "INACTIVO", administrator));
@@ -580,10 +582,10 @@ class ContactServiceTest {
         when(contactRepository.findById(111L)).thenReturn(Optional.of(deleted));
         when(contactRepository.findById(112L)).thenReturn(Optional.of(existingContact()));
 
-        assertThrows(ContactBusinessException.class, () -> contactService.softDelete(110L, administrator));
+        assertThrows(ContactNotFoundException.class, () -> contactService.softDelete(110L, administrator));
         assertThrows(ContactBusinessException.class, () -> contactService.softDelete(111L, administrator));
         assertThrows(ContactBusinessException.class, () -> contactService.restore(112L, administrator));
-        assertThrows(ContactBusinessException.class, () -> contactService.restore(110L, administrator));
+        assertThrows(ContactNotFoundException.class, () -> contactService.restore(110L, administrator));
         verify(contactRepository, never()).saveAndFlush(any(Contact.class));
     }
 
@@ -731,7 +733,7 @@ class ContactServiceTest {
 
         assertThrows(ContactBusinessException.class, () -> contactService.updateEditableData(
                 41L, new EditContactRequest("Av. Nueva 456"), administrator));
-        assertThrows(ContactBusinessException.class, () -> contactService.updateEditableData(
+        assertThrows(ContactNotFoundException.class, () -> contactService.updateEditableData(
                 42L, new EditContactRequest("Av. Nueva 456"), administrator));
         verify(contactRepository, never()).saveAndFlush(any(Contact.class));
     }

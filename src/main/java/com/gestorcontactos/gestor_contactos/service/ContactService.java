@@ -17,6 +17,8 @@ import com.gestorcontactos.gestor_contactos.entity.PersonType;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
+import com.gestorcontactos.gestor_contactos.exception.ContactConflictException;
+import com.gestorcontactos.gestor_contactos.exception.ContactNotFoundException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -115,12 +117,12 @@ public class ContactService {
         validatePermissionToAddCommercialType(actor, commercialType);
 
         Contact contact = contactRepository.findById(contactId)
-                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+                .orElseThrow(() -> new ContactNotFoundException("No se encontró el contacto indicado."));
         if (contact.getDeletedAt() != null) {
             throw new ContactBusinessException("No se puede agregar una relación comercial a un contacto eliminado.");
         }
         if (contact.getCommercialTypes().contains(commercialType)) {
-            throw new ContactBusinessException("El contacto ya tiene asignada esa relación comercial.");
+            throw new ContactConflictException("El contacto ya tiene asignada esa relación comercial.");
         }
 
         contact.addCommercialType(commercialType);
@@ -129,7 +131,7 @@ public class ContactService {
         try {
             return contactRepository.saveAndFlush(contact);
         } catch (DataIntegrityViolationException exception) {
-            throw new ContactBusinessException(
+            throw new ContactConflictException(
                     "No se pudo agregar la relación comercial por un conflicto con los datos registrados.");
         }
     }
@@ -137,7 +139,7 @@ public class ContactService {
     @Transactional
     public Contact changeStatus(Long contactId, String requestedStatus, User actor) {
         Contact contact = contactRepository.findById(contactId)
-                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+                .orElseThrow(() -> new ContactNotFoundException("No se encontró el contacto indicado."));
         if (contact.getDeletedAt() != null) {
             throw new ContactBusinessException("No se puede cambiar el estado de un contacto eliminado.");
         }
@@ -166,7 +168,7 @@ public class ContactService {
     @Transactional
     public Contact softDelete(Long contactId, User actor) {
         Contact contact = contactRepository.findById(contactId)
-                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+                .orElseThrow(() -> new ContactNotFoundException("No se encontró el contacto indicado."));
         if (contact.getDeletedAt() != null) {
             throw new ContactBusinessException("El contacto ya está eliminado.");
         }
@@ -181,7 +183,7 @@ public class ContactService {
     @Transactional
     public Contact restore(Long contactId, User actor) {
         Contact contact = contactRepository.findById(contactId)
-                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+                .orElseThrow(() -> new ContactNotFoundException("No se encontró el contacto indicado."));
         if (contact.getDeletedAt() == null) {
             throw new ContactBusinessException("El contacto no está eliminado.");
         }
@@ -363,7 +365,7 @@ public class ContactService {
 
     private void ensureIdentityIsNew(DocumentType documentType, String documentNumber) {
         if (contactRepository.findByDocumentTypeAndDocumentNumber(documentType, documentNumber).isPresent()) {
-            throw new ContactBusinessException("Ya existe un contacto con el documento indicado.");
+            throw new ContactConflictException("Ya existe un contacto con el documento indicado.");
         }
     }
 
@@ -372,7 +374,7 @@ public class ContactService {
             throw new AccessDeniedException("Se requiere un usuario autenticado para editar el contacto.");
         }
         Contact contact = contactRepository.findById(contactId)
-                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+                .orElseThrow(() -> new ContactNotFoundException("No se encontró el contacto indicado."));
         if (contact.getDeletedAt() != null) {
             throw new ContactBusinessException("No se puede modificar un contacto eliminado.");
         }
@@ -425,7 +427,7 @@ public class ContactService {
         try {
             return contactRepository.saveAndFlush(contact);
         } catch (DataIntegrityViolationException exception) {
-            throw new ContactBusinessException(
+            throw new ContactConflictException(
                     "No se pudo guardar la modificación porque algunos datos ya están registrados.");
         }
     }
@@ -519,7 +521,7 @@ public class ContactService {
         try {
             return contactRepository.saveAndFlush(contact);
         } catch (DataIntegrityViolationException exception) {
-            throw new ContactBusinessException(
+            throw new ContactConflictException(
                     "No se pudo crear el contacto porque existe un conflicto con los datos registrados.");
         }
     }

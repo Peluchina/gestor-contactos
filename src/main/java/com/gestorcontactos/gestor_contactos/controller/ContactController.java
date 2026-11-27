@@ -26,6 +26,7 @@ import com.gestorcontactos.gestor_contactos.entity.PhoneType;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
+import com.gestorcontactos.gestor_contactos.exception.ContactNotFoundException;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetails;
 import com.gestorcontactos.gestor_contactos.service.ContactService;
 import com.gestorcontactos.gestor_contactos.service.ContactPhotoStorageService;
@@ -218,7 +219,7 @@ public class ContactController {
             @AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
         User actor = authenticatedUser(currentUser);
         Contact contact = contactService.findById(id)
-                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+                .orElseThrow(() -> new ContactNotFoundException("No se encontró el contacto indicado."));
         boolean deleted = contact.getDeletedAt() != null;
         if (deleted && actor.getRole() != Role.ADMINISTRADOR) {
             throw new AccessDeniedException("No tiene permiso para consultar este contacto.");

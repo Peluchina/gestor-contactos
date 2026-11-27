@@ -19,6 +19,7 @@ import com.gestorcontactos.gestor_contactos.dto.UserListItem;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.UserManagementException;
+import com.gestorcontactos.gestor_contactos.exception.UserConflictException;
 import com.gestorcontactos.gestor_contactos.repository.UserRepository;
 import com.gestorcontactos.gestor_contactos.security.UserSessionManager;
 import java.time.Clock;
@@ -90,7 +91,7 @@ class UserServiceTest {
     void rejectsUsernameAlreadyUsedWithoutSaving() {
         when(userRepository.existsByUsernameIgnoreCase("ADMIN")).thenReturn(true);
 
-        UserManagementException exception = assertThrows(UserManagementException.class,
+        UserConflictException exception = assertThrows(UserConflictException.class,
                 () -> userService.createUser(createRequest("ADMIN", "password", Role.VENDEDOR), ADMIN_ID));
 
         assertEquals("Ese username ya está registrado.", exception.getMessage());

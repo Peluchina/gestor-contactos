@@ -15,6 +15,8 @@ import com.gestorcontactos.gestor_contactos.controller.LoginController;
 import com.gestorcontactos.gestor_contactos.controller.UserAdminController;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
+import com.gestorcontactos.gestor_contactos.exception.UserNotFoundException;
+import com.gestorcontactos.gestor_contactos.exception.UserConflictException;
 import com.gestorcontactos.gestor_contactos.service.UserService;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
@@ -126,6 +128,32 @@ class SecurityAuthenticationTest {
                         details("admin", "hash", Role.ADMINISTRADOR, true))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("users/list"));
+    }
+
+    @Test
+    void missingAdministrativeUserReturns404() throws Exception {
+        when(userService.getUser(999L, null)).thenThrow(new UserNotFoundException("internal user detail"));
+
+        mockMvc.perform(get("/usuarios/999/editar")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                                .user(details("admin", "hash", Role.ADMINISTRADOR, true))))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("error/404"));
+    }
+
+    @Test
+    void duplicateUsernameConflictReturns409() throws Exception {
+        when(userService.createUser(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.isNull()))
+                .thenThrow(new UserConflictException("internal duplicate details"));
+
+        mockMvc.perform(post("/usuarios").with(csrf())
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                                .user(details("admin", "hash", Role.ADMINISTRADOR, true)))
+                        .param("username", "existing-user")
+                        .param("password", "safe-password")
+                        .param("role", "VENDEDOR"))
+                .andExpect(status().isConflict())
+                .andExpect(view().name("error/409"));
     }
 
     @Test

@@ -379,6 +379,25 @@ input[type="file"] {
     border: 2px solid var(--color-success);
 }
 
+.photo-field-help,
+.photo-field-feedback {
+    margin: 0.2rem 0 0;
+    font-size: 0.9rem;
+}
+
+.photo-field-help {
+    color: var(--color-muted);
+}
+
+.photo-field-feedback {
+    min-height: 1.5em;
+    font-weight: 650;
+}
+
+.photo-field-feedback.is-invalid {
+    color: var(--color-danger);
+}
+
 input[type="checkbox"],
 input[type="radio"] {
     width: auto;

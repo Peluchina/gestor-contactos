@@ -55,9 +55,13 @@
         </figure>
         <p th:unless="${photoUrl}">Este contacto no tiene fotografía.</p>
         <form th:action="@{/contactos/{id}/foto(id=${contact.id})}" method="post" enctype="multipart/form-data">
-            <label>Agregar o reemplazar fotografía
-                <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
-            </label>
+            <label for="photo-edit">Agregar o reemplazar fotografía</label>
+            <input id="photo-edit" type="file" name="photo" data-photo-input
+                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required
+                   aria-describedby="photo-edit-help photo-edit-feedback">
+            <p class="photo-field-help" id="photo-edit-help">Tamaño máximo: 2 MB.</p>
+            <p class="photo-field-feedback" id="photo-edit-feedback" data-photo-feedback
+               role="alert" aria-live="polite"></p>
             <button type="submit">Guardar fotografía</button>
         </form>
         <form th:if="${photoUrl}" th:action="@{/contactos/{id}/foto/eliminar(id=${contact.id})}" method="post">
@@ -152,5 +156,6 @@
     </section>
 </main>
 <script th:src="@{/js/contact-collections.js}" defer></script>
+<script th:src="@{/js/photo-validation.js}" defer></script>
 </body>
 </html>

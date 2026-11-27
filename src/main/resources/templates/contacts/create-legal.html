@@ -39,9 +39,13 @@
         <fieldset class="form-section">
             <legend>Ubicación y fotografía</legend>
             <label>Dirección * <input type="text" th:field="*{address}" required></label>
-            <label>Fotografía (opcional)
-            <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
-            </label>
+            <label for="photo-legal">Fotografía (opcional)</label>
+            <input id="photo-legal" type="file" name="photo" data-photo-input
+                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                   aria-describedby="photo-legal-help photo-legal-feedback">
+            <p class="photo-field-help" id="photo-legal-help">Tamaño máximo: 2 MB.</p>
+            <p class="photo-field-feedback" id="photo-legal-feedback" data-photo-feedback
+               role="alert" aria-live="polite"></p>
         </fieldset>
         <fieldset class="form-section">
             <legend>Teléfonos</legend>
@@ -106,5 +110,6 @@
 </main>
 <script th:src="@{/js/contact-collections.js}" defer></script>
 <script th:src="@{/js/document-validation.js}" defer></script>
+<script th:src="@{/js/photo-validation.js}" defer></script>
 </body>
 </html>

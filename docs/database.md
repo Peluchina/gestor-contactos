@@ -43,17 +43,14 @@ Nombre recomendado:
 gestor_contactos
 ```
 
-La configuración de conexión no debe estar almacenada directamente en el código fuente.
-
-Ejemplo conceptual:
+Actualmente, la contraseña de MySQL se obtiene de `DB_PASSWORD`. La URL y el usuario están fijados en
+`src/main/resources/application.properties` (`localhost:3306/gestor_contactos` y `root`, respectivamente).
 
 ```text
-DB_URL
-DB_USERNAME
 DB_PASSWORD
 ```
 
-Los valores reales deben configurarse mediante variables de entorno o mecanismos equivalentes.
+El valor de `DB_PASSWORD` debe proporcionarse mediante el entorno de ejecución.
 
 ---
 

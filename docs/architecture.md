@@ -1095,15 +1095,14 @@ El nombre original del usuario no debe utilizarse directamente como nombre de al
 
 # 36. Configuración
 
-La configuración sensible se realizará mediante variables de entorno.
-
-Ejemplos:
+La contraseña de MySQL se proporciona mediante la variable de entorno:
 
 ```text
-DB_URL
-DB_USERNAME
 DB_PASSWORD
 ```
+
+La URL y el usuario de MySQL están fijados actualmente en `src/main/resources/application.properties`.
+El usuario configurado es `root` y la URL apunta a `localhost:3306/gestor_contactos`.
 
 La aplicación no debe contener credenciales reales dentro del código.
 

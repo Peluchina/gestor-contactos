@@ -192,6 +192,7 @@ public class ContactController {
             model.addAttribute("contact", toDetailsView(contact));
             model.addAttribute("restrictedView", false);
             model.addAttribute("canEdit", true);
+            model.addAttribute("canChangeStatus", actor.getRole() == Role.ADMINISTRADOR);
             model.addAttribute("photoUrl", contact.getPhotoPath() == null ? null : "/contactos/" + id + "/foto");
             addRelationActions(model, actor.getRole(), contact);
         }
@@ -301,6 +302,18 @@ public class ContactController {
             @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
         return applyContactChange(id, currentUser, redirectAttributes,
                 actor -> contactService.removePhoto(id, actor), "Fotografía eliminada correctamente.");
+    }
+
+    @PostMapping("/contactos/{id}/estado")
+    public String changeContactStatus(@PathVariable Long id, @RequestParam("status") String status,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        try {
+            contactService.changeStatus(id, status, authenticatedUser(currentUser));
+            redirectAttributes.addFlashAttribute("success", "Estado del contacto actualizado correctamente.");
+        } catch (ContactBusinessException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/contactos/" + id;
     }
 
     @PostMapping("/contactos/{id}/relaciones/cliente")

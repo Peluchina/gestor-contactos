@@ -21,6 +21,7 @@ import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.EditContactRequest;
 import com.gestorcontactos.gestor_contactos.entity.CommercialType;
 import com.gestorcontactos.gestor_contactos.entity.Contact;
+import com.gestorcontactos.gestor_contactos.entity.ContactStatus;
 import com.gestorcontactos.gestor_contactos.entity.DocumentType;
 import com.gestorcontactos.gestor_contactos.entity.PersonType;
 import com.gestorcontactos.gestor_contactos.entity.Role;
@@ -31,6 +32,7 @@ import com.gestorcontactos.gestor_contactos.service.ContactService;
 import com.gestorcontactos.gestor_contactos.service.ContactPhotoStorageService;
 import com.gestorcontactos.gestor_contactos.service.UserService;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -352,6 +354,64 @@ class ContactControllerSecurityTest {
 
         verify(contactService).createNaturalContact(any(CreateNaturalContactRequest.class), eq(admin),
                 any(org.springframework.web.multipart.MultipartFile.class));
+    }
+
+    @Test
+    void statusEndpointRequiresCsrfAndOnlyAdministratorCanUseIt() throws Exception {
+        User admin = actor("admin-status", Role.ADMINISTRADOR);
+        User seller = actor("seller-status", Role.VENDEDOR);
+        User purchasing = actor("purchasing-status", Role.COMPRAS);
+        User warehouse = actor("warehouse-status", Role.ALMACENERO);
+
+        mockMvc.perform(post("/contactos/71/estado").with(user(new CustomUserDetails(admin)))
+                        .param("status", "INACTIVO"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/contactos/71/estado").with(user(new CustomUserDetails(admin))).with(csrf())
+                        .param("status", "INACTIVO").param("updatedBy", "999")
+                        .param("updatedAt", "2099-01-01T00:00:00").param("role", "ADMINISTRADOR")
+                        .param("documentNumber", "87654321"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos/71"));
+
+        for (User denied : List.of(seller, purchasing, warehouse)) {
+            mockMvc.perform(post("/contactos/71/estado").with(user(new CustomUserDetails(denied))).with(csrf())
+                            .param("status", "INACTIVO"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(post("/contactos/71/estado").with(user(new CustomUserDetails(denied))).with(csrf())
+                            .param("status", "ACTIVO"))
+                    .andExpect(status().isForbidden());
+        }
+
+        verify(contactService).changeStatus(71L, "INACTIVO", admin);
+        verify(contactService, never()).changeStatus(eq(71L), any(String.class), eq(seller));
+        verify(contactService, never()).changeStatus(eq(71L), any(String.class), eq(purchasing));
+        verify(contactService, never()).changeStatus(eq(71L), any(String.class), eq(warehouse));
+    }
+
+    @Test
+    void onlyAdministratorSeesTheStatusTransitionForm() throws Exception {
+        User admin = actor("admin-status-view", Role.ADMINISTRADOR);
+        User seller = actor("seller-status-view", Role.VENDEDOR);
+        Contact contact = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), admin);
+        contact.addCommercialType(CommercialType.CLIENTE);
+        when(contactService.findById(72L)).thenReturn(Optional.of(contact));
+        when(contactService.findById(73L)).thenReturn(Optional.of(contact));
+
+        mockMvc.perform(get("/contactos/72").with(user(new CustomUserDetails(admin))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"status\" value=\"INACTIVO\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Estado:")));
+
+        contact.setStatus(ContactStatus.INACTIVO);
+        mockMvc.perform(get("/contactos/73").with(user(new CustomUserDetails(admin))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"status\" value=\"ACTIVO\"")));
+
+        contact.setStatus(ContactStatus.ACTIVO);
+        mockMvc.perform(get("/contactos/72").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("name=\"status\""))));
     }
 
     @Test

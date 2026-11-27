@@ -27,8 +27,6 @@ import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
-import com.gestorcontactos.gestor_contactos.service.ContactPhotoStorageService;
-import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.List;
@@ -373,6 +371,85 @@ class ContactServiceTest {
         }
         assertEquals(1, EditContactRequest.class.getRecordComponents().length);
         assertEquals("address", EditContactRequest.class.getRecordComponents()[0].getName());
+    }
+
+    @Test
+    void administratorCanInactivateAndReactivateContactWithoutChangingOtherData() {
+        Contact active = existingContactWithType(CommercialType.CLIENTE);
+        active.addPhone(new com.gestorcontactos.gestor_contactos.entity.ContactPhone(
+                PhoneType.CELULAR, "", "987654321"));
+        active.addEmail(new com.gestorcontactos.gestor_contactos.entity.ContactEmail("contact@example.com"));
+        active.setPhotoPath("uploads/contacts/00000000-0000-0000-0000-000000000001.jpg");
+        Contact inactive = existingContactWithType(CommercialType.PROVEEDOR);
+        inactive.setStatus(ContactStatus.INACTIVO);
+        prepareContactForUpdate(101L, active);
+        prepareContactForUpdate(102L, inactive);
+        LocalDateTime before = LocalDateTime.now(java.time.ZoneId.of("America/Lima"));
+
+        Contact madeInactive = contactService.changeStatus(101L, "INACTIVO", administrator);
+        Contact madeActive = contactService.changeStatus(102L, "ACTIVO", administrator);
+
+        assertEquals(ContactStatus.INACTIVO, madeInactive.getStatus());
+        assertEquals(ContactStatus.ACTIVO, madeActive.getStatus());
+        assertEquals("Existente", madeInactive.getFirstNames());
+        assertEquals("Prueba", madeInactive.getLastNames());
+        assertEquals(DocumentType.DNI, madeInactive.getDocumentType());
+        assertEquals("12345678", madeInactive.getDocumentNumber());
+        assertEquals("Av. Perú 123", madeInactive.getAddress());
+        assertEquals("987654321", madeInactive.getPhones().get(0).getPhoneNumber());
+        assertEquals("contact@example.com", madeInactive.getEmails().get(0).getEmail());
+        assertEquals("uploads/contacts/00000000-0000-0000-0000-000000000001.jpg", madeInactive.getPhotoPath());
+        assertEquals(Set.of(CommercialType.CLIENTE), madeInactive.getCommercialTypes());
+        assertEquals(administrator, madeInactive.getUpdatedBy());
+        assertNotNull(madeInactive.getUpdatedAt());
+        assertFalse(madeInactive.getUpdatedAt().isBefore(before));
+        assertFalse(madeInactive.getUpdatedAt().isAfter(LocalDateTime.now(java.time.ZoneId.of("America/Lima"))));
+        verify(contactRepository).saveAndFlush(active);
+        verify(contactRepository).saveAndFlush(inactive);
+    }
+
+    @Test
+    void nonAdministratorsCannotActivateOrInactivateContacts() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        when(contactRepository.findById(103L)).thenReturn(Optional.of(contact));
+
+        for (Role role : List.of(Role.VENDEDOR, Role.COMPRAS, Role.ALMACENERO)) {
+            assertThrows(AccessDeniedException.class,
+                    () -> contactService.changeStatus(103L, "INACTIVO", user(role)));
+            assertThrows(AccessDeniedException.class,
+                    () -> contactService.changeStatus(103L, "ACTIVO", user(role)));
+        }
+        assertThrows(AccessDeniedException.class, () -> contactService.changeStatus(103L, "INACTIVO", null));
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
+    }
+
+    @Test
+    void rejectsStatusChangeForMissingOrSoftDeletedContact() {
+        Contact deleted = existingContactWithType(CommercialType.CLIENTE);
+        deleted.setDeletedAt(LocalDateTime.now());
+        when(contactRepository.findById(104L)).thenReturn(Optional.empty());
+        when(contactRepository.findById(105L)).thenReturn(Optional.of(deleted));
+
+        assertThrows(ContactBusinessException.class,
+                () -> contactService.changeStatus(104L, "INACTIVO", administrator));
+        assertThrows(ContactBusinessException.class,
+                () -> contactService.changeStatus(105L, "INACTIVO", administrator));
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
+    }
+
+    @Test
+    void rejectsInvalidNullAndUnchangedStatuses() {
+        Contact active = existingContactWithType(CommercialType.CLIENTE);
+        when(contactRepository.findById(106L)).thenReturn(Optional.of(active));
+
+        assertThrows(ContactBusinessException.class,
+                () -> contactService.changeStatus(106L, "ELIMINADO", administrator));
+        assertThrows(ContactBusinessException.class,
+                () -> contactService.changeStatus(106L, null, administrator));
+        assertThrows(ContactBusinessException.class,
+                () -> contactService.changeStatus(106L, "ACTIVO", administrator));
+        assertEquals(ContactStatus.ACTIVO, active.getStatus());
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
     }
 
     @Test

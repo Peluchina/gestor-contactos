@@ -40,6 +40,8 @@ public class SecurityConfig {
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
                         .requestMatchers(HttpMethod.GET, "/contactos/*/foto")
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST, "/contactos/*/estado")
+                                .hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/cliente")
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR")
                         .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/proveedor")

@@ -11,6 +11,7 @@ import com.gestorcontactos.gestor_contactos.entity.CommercialType;
 import com.gestorcontactos.gestor_contactos.entity.Contact;
 import com.gestorcontactos.gestor_contactos.entity.ContactEmail;
 import com.gestorcontactos.gestor_contactos.entity.ContactPhone;
+import com.gestorcontactos.gestor_contactos.entity.ContactStatus;
 import com.gestorcontactos.gestor_contactos.entity.DocumentType;
 import com.gestorcontactos.gestor_contactos.entity.PersonType;
 import com.gestorcontactos.gestor_contactos.entity.User;
@@ -125,6 +126,35 @@ public class ContactService {
             throw new ContactBusinessException(
                     "No se pudo agregar la relación comercial por un conflicto con los datos registrados.");
         }
+    }
+
+    @Transactional
+    public Contact changeStatus(Long contactId, String requestedStatus, User actor) {
+        Contact contact = contactRepository.findById(contactId)
+                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+        if (contact.getDeletedAt() != null) {
+            throw new ContactBusinessException("No se puede cambiar el estado de un contacto eliminado.");
+        }
+        if (actor == null || actor.getRole() != com.gestorcontactos.gestor_contactos.entity.Role.ADMINISTRADOR
+                || !actor.isEnabled()) {
+            throw new AccessDeniedException("Solo un administrador habilitado puede cambiar el estado del contacto.");
+        }
+        if (requestedStatus == null) {
+            throw new ContactBusinessException("El estado solicitado no es válido.");
+        }
+
+        ContactStatus newStatus;
+        try {
+            newStatus = ContactStatus.valueOf(requestedStatus);
+        } catch (IllegalArgumentException exception) {
+            throw new ContactBusinessException("El estado solicitado no es válido.");
+        }
+        if (contact.getStatus() == newStatus) {
+            throw new ContactBusinessException("El contacto ya se encuentra en el estado solicitado.");
+        }
+
+        contact.setStatus(newStatus);
+        return saveModified(contact, actor);
     }
 
     @Transactional(readOnly = true)

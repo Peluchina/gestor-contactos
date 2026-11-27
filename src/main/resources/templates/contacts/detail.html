@@ -19,6 +19,14 @@
         <p th:unless="${photoUrl}">Este contacto no tiene fotografía.</p>
         <p>Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
         <p>Estado: <span th:text="${contact.status}"></span></p>
+        <form th:if="${canChangeStatus}" th:action="@{/contactos/{id}/estado(id=${contact.id})}" method="post">
+            <button th:if="${contact.status.name() == 'ACTIVO'}" type="submit" name="status" value="INACTIVO">
+                Inactivar contacto
+            </button>
+            <button th:if="${contact.status.name() == 'INACTIVO'}" type="submit" name="status" value="ACTIVO">
+                Activar contacto
+            </button>
+        </form>
         <p>Relaciones: <span th:text="${contact.commercialTypes}"></span></p>
         <h2>Teléfonos</h2>
         <ul><li th:each="phone : ${contact.phones}"

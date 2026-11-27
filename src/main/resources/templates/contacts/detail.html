@@ -12,6 +12,7 @@
     <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
     <p>Dirección: <span th:text="${contact.address}"></span></p>
     <section th:unless="${restrictedView}">
+        <a th:if="${canEdit}" th:href="@{/contactos/{id}/editar(id=${contact.id})}">Editar datos permitidos</a>
         <p>Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
         <p>Estado: <span th:text="${contact.status}"></span></p>
         <p>Relaciones: <span th:text="${contact.commercialTypes}"></span></p>

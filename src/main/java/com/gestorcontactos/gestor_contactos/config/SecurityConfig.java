@@ -36,10 +36,21 @@ public class SecurityConfig {
                                 .hasAnyRole("ADMINISTRADOR", "COMPRAS")
                         .requestMatchers(HttpMethod.GET, "/contactos/buscar")
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.GET, "/contactos/*/editar")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
                         .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/cliente")
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR")
                         .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/proveedor")
                                 .hasAnyRole("ADMINISTRADOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST,
+                                "/contactos/*/editar",
+                                "/contactos/*/telefonos",
+                                "/contactos/*/telefonos/*/editar",
+                                "/contactos/*/telefonos/*/eliminar",
+                                "/contactos/*/correos",
+                                "/contactos/*/correos/*/editar",
+                                "/contactos/*/correos/*/eliminar")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
                         .requestMatchers("/contactos/**")
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS", "ALMACENERO")
                         .anyRequest().authenticated())

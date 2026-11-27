@@ -13,6 +13,9 @@ import com.gestorcontactos.gestor_contactos.dto.CreateContactEmailRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateContactPhoneRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.ContactEmailRequest;
+import com.gestorcontactos.gestor_contactos.dto.ContactPhoneRequest;
+import com.gestorcontactos.gestor_contactos.dto.EditContactRequest;
 import com.gestorcontactos.gestor_contactos.entity.CommercialType;
 import com.gestorcontactos.gestor_contactos.entity.Contact;
 import com.gestorcontactos.gestor_contactos.entity.ContactStatus;
@@ -34,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.springframework.security.access.AccessDeniedException;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -363,9 +367,151 @@ class ContactServiceTest {
             assertThrows(NoSuchMethodException.class,
                     () -> Contact.class.getMethod(setterName, entry.getValue()));
         }
-        for (Method method : ContactService.class.getDeclaredMethods()) {
-            assertFalse(method.getName().startsWith("update") || method.getName().startsWith("edit"));
-        }
+        assertEquals(1, EditContactRequest.class.getRecordComponents().length);
+        assertEquals("address", EditContactRequest.class.getRecordComponents()[0].getName());
+    }
+
+    @Test
+    void administratorSellerAndPurchasingCanUpdateAddressWithinTheirContactScope() {
+        Contact adminContact = existingContactWithType(CommercialType.PROVEEDOR);
+        Contact sellerContact = existingContactWithType(CommercialType.CLIENTE);
+        Contact buyerContact = existingContactWithType(CommercialType.PROVEEDOR);
+        prepareContactForUpdate(31L, adminContact);
+        prepareContactForUpdate(32L, sellerContact);
+        prepareContactForUpdate(33L, buyerContact);
+
+        contactService.updateEditableData(31L, new EditContactRequest("  Av. Nueva 456  "), administrator);
+        contactService.updateEditableData(32L, new EditContactRequest("Jr. Cliente 123"), user(Role.VENDEDOR));
+        contactService.updateEditableData(33L, new EditContactRequest("Jr. Proveedor 123"), user(Role.COMPRAS));
+
+        assertEquals("Av. Nueva 456", adminContact.getAddress());
+        assertEquals("Jr. Cliente 123", sellerContact.getAddress());
+        assertEquals("Jr. Proveedor 123", buyerContact.getAddress());
+    }
+
+    @Test
+    void warehouseAndRolesOutsideCommercialScopeCannotEdit() {
+        Contact supplier = existingContactWithType(CommercialType.PROVEEDOR);
+        Contact client = existingContactWithType(CommercialType.CLIENTE);
+        when(contactRepository.findById(34L)).thenReturn(Optional.of(supplier));
+        when(contactRepository.findById(35L)).thenReturn(Optional.of(client));
+
+        assertThrows(AccessDeniedException.class, () -> contactService.updateEditableData(
+                34L, new EditContactRequest("Av. Nueva 456"), user(Role.VENDEDOR)));
+        assertThrows(AccessDeniedException.class, () -> contactService.updateEditableData(
+                35L, new EditContactRequest("Av. Nueva 456"), user(Role.COMPRAS)));
+        assertThrows(AccessDeniedException.class, () -> contactService.updateEditableData(
+                35L, new EditContactRequest("Av. Nueva 456"), user(Role.ALMACENERO)));
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
+    }
+
+    @Test
+    void editRequestCannotChangeIdentityAndAuditUsesAuthenticatedActor() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        User seller = user(Role.VENDEDOR);
+        prepareContactForUpdate(36L, contact);
+        LocalDateTime before = LocalDateTime.now(java.time.ZoneId.of("America/Lima"));
+
+        contactService.updateEditableData(36L, new EditContactRequest("Av. Nueva 456"), seller);
+
+        assertEquals("Existente", contact.getFirstNames());
+        assertEquals("Prueba", contact.getLastNames());
+        assertEquals(DocumentType.DNI, contact.getDocumentType());
+        assertEquals("12345678", contact.getDocumentNumber());
+        assertEquals(seller, contact.getUpdatedBy());
+        assertFalse(contact.getUpdatedAt().isBefore(before));
+        assertFalse(contact.getUpdatedAt().isAfter(LocalDateTime.now(java.time.ZoneId.of("America/Lima"))));
+    }
+
+    @Test
+    void rejectsInvalidAddressAndDoesNotSave() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        when(contactRepository.findById(37L)).thenReturn(Optional.of(contact));
+
+        assertThrows(ContactBusinessException.class, () -> contactService.updateEditableData(
+                37L, new EditContactRequest("bad"), administrator));
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
+    }
+
+    @Test
+    void addsAndUpdatesPhoneAndRejectsDuplicates() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        var existingPhone = new com.gestorcontactos.gestor_contactos.entity.ContactPhone(
+                PhoneType.CELULAR, "", "987654321");
+        setEntityId(existingPhone, 1L);
+        contact.addPhone(existingPhone);
+        prepareContactForUpdate(38L, contact);
+
+        contactService.addPhone(38L, new ContactPhoneRequest(PhoneType.FIJO, "01", "2345678"), administrator);
+        assertEquals(2, contact.getPhones().size());
+        assertEquals("01", contact.getPhones().get(1).getAreaCode());
+        assertThrows(ContactBusinessException.class, () -> contactService.addPhone(38L,
+                new ContactPhoneRequest(PhoneType.CELULAR, "", "987654321"), administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.addPhone(38L,
+                new ContactPhoneRequest(PhoneType.CELULAR, "", "987"), administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.updatePhone(38L,
+                contact.getPhones().get(1).getId(),
+                new ContactPhoneRequest(PhoneType.CELULAR, "", "987654321"), administrator));
+        contactService.updatePhone(38L, contact.getPhones().get(1).getId(),
+                new ContactPhoneRequest(PhoneType.CELULAR, "", "912345678"), administrator);
+        assertEquals("912345678", contact.getPhones().get(1).getPhoneNumber());
+    }
+
+    @Test
+    void removesPhoneOnlyWhenAtLeastOneRemains() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        var first = new com.gestorcontactos.gestor_contactos.entity.ContactPhone(PhoneType.CELULAR, "", "987654321");
+        var second = new com.gestorcontactos.gestor_contactos.entity.ContactPhone(PhoneType.CELULAR, "", "912345678");
+        setEntityId(first, 1L);
+        setEntityId(second, 2L);
+        contact.addPhone(first);
+        contact.addPhone(second);
+        prepareContactForUpdate(39L, contact);
+
+        contactService.removePhone(39L, first.getId(), administrator);
+        assertEquals(1, contact.getPhones().size());
+        assertThrows(ContactBusinessException.class, () -> contactService.removePhone(39L, second.getId(), administrator));
+    }
+
+    @Test
+    void managesEmailsNormalizesAndRejectsDuplicatesAndLastRemoval() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        var first = new com.gestorcontactos.gestor_contactos.entity.ContactEmail("one@example.com");
+        var second = new com.gestorcontactos.gestor_contactos.entity.ContactEmail("two@example.com");
+        setEntityId(first, 1L);
+        setEntityId(second, 2L);
+        contact.addEmail(first);
+        contact.addEmail(second);
+        prepareContactForUpdate(40L, contact);
+
+        contactService.addEmail(40L, new ContactEmailRequest("THREE@example.com"), administrator);
+        assertEquals("three@example.com", contact.getEmails().get(2).getEmail());
+        assertThrows(ContactBusinessException.class, () -> contactService.addEmail(40L,
+                new ContactEmailRequest("ONE@example.com"), administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.addEmail(40L,
+                new ContactEmailRequest("invalid"), administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.updateEmail(40L, second.getId(),
+                new ContactEmailRequest("ONE@example.com"), administrator));
+        contactService.updateEmail(40L, second.getId(), new ContactEmailRequest("UPDATED@example.com"), administrator);
+        assertEquals("updated@example.com", second.getEmail());
+        contactService.removeEmail(40L, first.getId(), administrator);
+        contactService.removeEmail(40L, second.getId(), administrator);
+        assertThrows(ContactBusinessException.class, () -> contactService.removeEmail(40L,
+                contact.getEmails().get(0).getId(), administrator));
+    }
+
+    @Test
+    void deletedOrMissingContactCannotBeEdited() {
+        Contact deleted = existingContactWithType(CommercialType.CLIENTE);
+        deleted.setDeletedAt(LocalDateTime.now());
+        when(contactRepository.findById(41L)).thenReturn(Optional.of(deleted));
+        when(contactRepository.findById(42L)).thenReturn(Optional.empty());
+
+        assertThrows(ContactBusinessException.class, () -> contactService.updateEditableData(
+                41L, new EditContactRequest("Av. Nueva 456"), administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.updateEditableData(
+                42L, new EditContactRequest("Av. Nueva 456"), administrator));
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
     }
 
     @Test
@@ -469,5 +615,15 @@ class ContactServiceTest {
     private void prepareContactForUpdate(Long contactId, Contact contact) {
         when(contactRepository.findById(contactId)).thenReturn(Optional.of(contact));
         when(contactRepository.saveAndFlush(contact)).thenReturn(contact);
+    }
+
+    private void setEntityId(Object entity, Long id) {
+        try {
+            var field = entity.getClass().getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(entity, id);
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError("Unable to prepare persisted entity fixture", exception);
+        }
     }
 }

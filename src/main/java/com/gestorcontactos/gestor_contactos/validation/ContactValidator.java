@@ -4,6 +4,8 @@ import com.gestorcontactos.gestor_contactos.dto.CreateContactEmailRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateContactPhoneRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.ContactEmailRequest;
+import com.gestorcontactos.gestor_contactos.dto.ContactPhoneRequest;
 import com.gestorcontactos.gestor_contactos.entity.CommercialType;
 import com.gestorcontactos.gestor_contactos.entity.DocumentType;
 import com.gestorcontactos.gestor_contactos.entity.PhoneType;
@@ -74,6 +76,31 @@ public class ContactValidator {
         validateDocument(normalized.documentType(), normalized.documentNumber());
         validateAddress(normalized.address());
         validateCollections(normalized.phones(), normalized.emails(), normalized.commercialTypes());
+        return normalized;
+    }
+
+    public String normalizeAndValidateAddress(String address) {
+        String normalized = normalizeSpaces(address);
+        validateAddress(normalized);
+        return normalized;
+    }
+
+    public ContactPhoneRequest normalizeAndValidatePhone(ContactPhoneRequest request) {
+        if (request == null) {
+            throw new ContactBusinessException("Los datos del teléfono son obligatorios.");
+        }
+        String areaCode = request.areaCode() == null ? "" : request.areaCode();
+        validatePhones(List.of(new CreateContactPhoneRequest(
+                request.phoneType(), areaCode, request.phoneNumber())));
+        return new ContactPhoneRequest(request.phoneType(), areaCode, request.phoneNumber());
+    }
+
+    public String normalizeAndValidateEmail(ContactEmailRequest request) {
+        if (request == null || request.email() == null) {
+            throw new ContactBusinessException("El correo electrónico es obligatorio.");
+        }
+        String normalized = request.email().toLowerCase(Locale.ROOT);
+        validateEmails(List.of(new CreateContactEmailRequest(normalized)));
         return normalized;
     }
 

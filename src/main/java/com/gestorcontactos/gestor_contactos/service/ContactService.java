@@ -4,6 +4,9 @@ import com.gestorcontactos.gestor_contactos.dto.CreateContactEmailRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateContactPhoneRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.ContactEmailRequest;
+import com.gestorcontactos.gestor_contactos.dto.ContactPhoneRequest;
+import com.gestorcontactos.gestor_contactos.dto.EditContactRequest;
 import com.gestorcontactos.gestor_contactos.entity.CommercialType;
 import com.gestorcontactos.gestor_contactos.entity.Contact;
 import com.gestorcontactos.gestor_contactos.entity.ContactEmail;
@@ -15,9 +18,12 @@ import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,6 +88,95 @@ public class ContactService {
     }
 
     @Transactional(readOnly = true)
+    public Contact getContactForEditing(Long contactId, User actor) {
+        return loadEditableContact(contactId, actor);
+    }
+
+    @Transactional
+    public Contact updateEditableData(Long contactId, EditContactRequest request, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        if (request == null) {
+            throw new ContactBusinessException("Los datos de edición son obligatorios.");
+        }
+        contact.setAddress(contactValidator.normalizeAndValidateAddress(request.address()));
+        return saveModified(contact, actor);
+    }
+
+    @Transactional
+    public Contact addPhone(Long contactId, ContactPhoneRequest request, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        ContactPhoneRequest valid = contactValidator.normalizeAndValidatePhone(request);
+        if (contact.getPhones().stream().anyMatch(phone -> samePhone(phone, valid))) {
+            throw new ContactBusinessException("No se permiten teléfonos duplicados en el contacto.");
+        }
+        contact.addPhone(new ContactPhone(valid.phoneType(), valid.areaCode(), valid.phoneNumber()));
+        return saveModified(contact, actor);
+    }
+
+    @Transactional
+    public Contact updatePhone(Long contactId, Long phoneId, ContactPhoneRequest request, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        ContactPhone phone = findPhone(contact, phoneId);
+        ContactPhoneRequest valid = contactValidator.normalizeAndValidatePhone(request);
+        if (contact.getPhones().stream()
+                .filter(existing -> !Objects.equals(existing.getId(), phoneId))
+                .anyMatch(existing -> samePhone(existing, valid))) {
+            throw new ContactBusinessException("No se permiten teléfonos duplicados en el contacto.");
+        }
+        phone.setPhoneType(valid.phoneType());
+        phone.setAreaCode(valid.areaCode());
+        phone.setPhoneNumber(valid.phoneNumber());
+        return saveModified(contact, actor);
+    }
+
+    @Transactional
+    public Contact removePhone(Long contactId, Long phoneId, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        ContactPhone phone = findPhone(contact, phoneId);
+        if (contact.getPhones().size() <= 1) {
+            throw new ContactBusinessException("El contacto debe conservar al menos un teléfono.");
+        }
+        contact.removePhone(phone);
+        return saveModified(contact, actor);
+    }
+
+    @Transactional
+    public Contact addEmail(Long contactId, ContactEmailRequest request, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        String validEmail = contactValidator.normalizeAndValidateEmail(request);
+        if (contact.getEmails().stream().anyMatch(email -> email.getEmail().equalsIgnoreCase(validEmail))) {
+            throw new ContactBusinessException("No se permiten correos electrónicos duplicados en el contacto.");
+        }
+        contact.addEmail(new ContactEmail(validEmail));
+        return saveModified(contact, actor);
+    }
+
+    @Transactional
+    public Contact updateEmail(Long contactId, Long emailId, ContactEmailRequest request, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        ContactEmail email = findEmail(contact, emailId);
+        String validEmail = contactValidator.normalizeAndValidateEmail(request);
+        if (contact.getEmails().stream()
+                .filter(existing -> !Objects.equals(existing.getId(), emailId))
+                .anyMatch(existing -> existing.getEmail().equalsIgnoreCase(validEmail))) {
+            throw new ContactBusinessException("No se permiten correos electrónicos duplicados en el contacto.");
+        }
+        email.setEmail(validEmail);
+        return saveModified(contact, actor);
+    }
+
+    @Transactional
+    public Contact removeEmail(Long contactId, Long emailId, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        ContactEmail email = findEmail(contact, emailId);
+        if (contact.getEmails().size() <= 1) {
+            throw new ContactBusinessException("El contacto debe conservar al menos un correo electrónico.");
+        }
+        contact.removeEmail(email);
+        return saveModified(contact, actor);
+    }
+
+    @Transactional(readOnly = true)
     public Optional<Contact> findById(Long id) {
         return contactRepository.findById(id);
     }
@@ -104,6 +199,61 @@ public class ContactService {
     private void ensureIdentityIsNew(DocumentType documentType, String documentNumber) {
         if (contactRepository.findByDocumentTypeAndDocumentNumber(documentType, documentNumber).isPresent()) {
             throw new ContactBusinessException("Ya existe un contacto con el documento indicado.");
+        }
+    }
+
+    private Contact loadEditableContact(Long contactId, User actor) {
+        if (actor == null || actor.getRole() == null || !actor.isEnabled()) {
+            throw new AccessDeniedException("Se requiere un usuario autenticado para editar el contacto.");
+        }
+        Contact contact = contactRepository.findById(contactId)
+                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+        if (contact.getDeletedAt() != null) {
+            throw new ContactBusinessException("No se puede modificar un contacto eliminado.");
+        }
+
+        boolean allowed = switch (actor.getRole()) {
+            case ADMINISTRADOR -> true;
+            case VENDEDOR -> contact.getStatus() == com.gestorcontactos.gestor_contactos.entity.ContactStatus.ACTIVO
+                    && contact.getCommercialTypes().contains(CommercialType.CLIENTE);
+            case COMPRAS -> contact.getStatus() == com.gestorcontactos.gestor_contactos.entity.ContactStatus.ACTIVO
+                    && contact.getCommercialTypes().contains(CommercialType.PROVEEDOR);
+            case ALMACENERO -> false;
+        };
+        if (!allowed) {
+            throw new AccessDeniedException("No tiene permisos para editar este contacto.");
+        }
+        return contact;
+    }
+
+    private ContactPhone findPhone(Contact contact, Long phoneId) {
+        return contact.getPhones().stream()
+                .filter(phone -> Objects.equals(phone.getId(), phoneId))
+                .findFirst()
+                .orElseThrow(() -> new ContactBusinessException("No se encontró el teléfono indicado."));
+    }
+
+    private ContactEmail findEmail(Contact contact, Long emailId) {
+        return contact.getEmails().stream()
+                .filter(email -> Objects.equals(email.getId(), emailId))
+                .findFirst()
+                .orElseThrow(() -> new ContactBusinessException("No se encontró el correo indicado."));
+    }
+
+    private boolean samePhone(ContactPhone existing, ContactPhoneRequest request) {
+        return existing.getPhoneType() == request.phoneType()
+                && Objects.equals(existing.getAreaCode(), request.areaCode())
+                && Objects.equals(existing.getPhoneNumber(), request.phoneNumber());
+    }
+
+    private Contact saveModified(Contact contact, User actor) {
+        contact.setUpdatedBy(actor);
+        contact.setUpdatedAt(LocalDateTime.now(ZoneId.of("America/Lima")));
+        try {
+            return contactRepository.saveAndFlush(contact);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ContactBusinessException(
+                    "No se pudo guardar la modificación porque algunos datos ya están registrados.");
         }
     }
 

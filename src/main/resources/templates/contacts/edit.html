@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Editar contacto | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <a th:href="@{/contactos/{id}(id=${contact.id})}">Volver al contacto</a>
+    <h1>Editar contacto</h1>
+    <p th:if="${success}" th:text="${success}" role="status"></p>
+    <p th:if="${error}" th:text="${error}" role="alert"></p>
+
+    <section aria-labelledby="identity-title">
+        <h2 id="identity-title">Identidad (no editable)</h2>
+        <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
+        <label th:if="${contact.personType.name() == 'NATURAL'}">Nombres
+            <input type="text" th:value="${contact.firstNames}" readonly>
+        </label>
+        <label th:if="${contact.personType.name() == 'NATURAL'}">Apellidos
+            <input type="text" th:value="${contact.lastNames}" readonly>
+        </label>
+        <label th:if="${contact.personType.name() == 'JURIDICA'}">Razón social
+            <input type="text" th:value="${contact.legalName}" readonly>
+        </label>
+        <label>Tipo de documento
+            <input type="text" th:value="${contact.documentType}" readonly>
+        </label>
+        <label>Número de documento
+            <input type="text" th:value="${contact.documentNumber}" readonly>
+        </label>
+    </section>
+
+    <section aria-labelledby="editable-title">
+        <h2 id="editable-title">Datos editables</h2>
+        <p>Estado: <span th:text="${contact.status}"></span></p>
+        <p>Relaciones comerciales: <span th:text="${contact.commercialTypes}"></span></p>
+        <form th:action="@{/contactos/{id}/editar(id=${contact.id})}" th:object="${form}" method="post">
+            <div th:if="${#fields.hasGlobalErrors()}" role="alert">
+                <p th:each="fieldError : ${#fields.globalErrors()}" th:text="${fieldError}"></p>
+            </div>
+            <label>Dirección <input type="text" th:field="*{address}" required></label>
+            <button type="submit">Guardar dirección</button>
+        </form>
+    </section>
+
+    <section aria-labelledby="phones-title">
+        <h2 id="phones-title">Teléfonos</h2>
+        <div th:each="phone : ${contact.phones}">
+            <form th:action="@{/contactos/{id}/telefonos/{phoneId}/editar(id=${contact.id},phoneId=${phone.id})}"
+                  method="post">
+                <label>Tipo
+                    <select name="phoneType" required>
+                        <option value="CELULAR" th:selected="${phone.phoneType.name() == 'CELULAR'}">Celular</option>
+                        <option value="FIJO" th:selected="${phone.phoneType.name() == 'FIJO'}">Fijo</option>
+                    </select>
+                </label>
+                <label>Código de área <input type="text" name="areaCode" th:value="${phone.areaCode}"></label>
+                <label>Número <input type="text" name="phoneNumber" th:value="${phone.phoneNumber}" required></label>
+                <button type="submit">Guardar teléfono</button>
+            </form>
+            <form th:action="@{/contactos/{id}/telefonos/{phoneId}/eliminar(id=${contact.id},phoneId=${phone.id})}"
+                  method="post">
+                <button type="submit">Eliminar teléfono</button>
+            </form>
+        </div>
+        <form th:action="@{/contactos/{id}/telefonos(id=${contact.id})}"
+              th:object="${phoneForm}" method="post">
+            <h3>Agregar teléfono</h3>
+            <label>Tipo
+                <select th:field="*{phoneType}" required>
+                    <option value="CELULAR">Celular</option>
+                    <option value="FIJO">Fijo</option>
+                </select>
+            </label>
+            <label>Código de área <input type="text" th:field="*{areaCode}"></label>
+            <label>Número <input type="text" th:field="*{phoneNumber}" required></label>
+            <button type="submit">Agregar teléfono</button>
+        </form>
+    </section>
+
+    <section aria-labelledby="emails-title">
+        <h2 id="emails-title">Correos electrónicos</h2>
+        <div th:each="email : ${contact.emails}">
+            <form th:action="@{/contactos/{id}/correos/{emailId}/editar(id=${contact.id},emailId=${email.id})}"
+                  method="post">
+                <label>Correo <input type="email" name="email" th:value="${email.email}" required></label>
+                <button type="submit">Guardar correo</button>
+            </form>
+            <form th:action="@{/contactos/{id}/correos/{emailId}/eliminar(id=${contact.id},emailId=${email.id})}"
+                  method="post">
+                <button type="submit">Eliminar correo</button>
+            </form>
+        </div>
+        <form th:action="@{/contactos/{id}/correos(id=${contact.id})}"
+              th:object="${emailForm}" method="post">
+            <h3>Agregar correo electrónico</h3>
+            <label>Correo <input type="email" th:field="*{email}" required></label>
+            <button type="submit">Agregar correo</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

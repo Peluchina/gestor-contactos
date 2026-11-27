@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gestorcontactos.gestor_contactos.config.SecurityConfig;
 import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.EditContactRequest;
 import com.gestorcontactos.gestor_contactos.entity.CommercialType;
 import com.gestorcontactos.gestor_contactos.entity.Contact;
 import com.gestorcontactos.gestor_contactos.entity.DocumentType;
@@ -37,6 +38,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.mockito.ArgumentCaptor.forClass;
 
 @WebMvcTest(ContactController.class)
 @Import(SecurityConfig.class)
@@ -197,6 +199,62 @@ class ContactControllerSecurityTest {
                         .params(validNaturalParameters()).param("commercialTypes", "CLIENTE"))
                 .andExpect(status().isForbidden());
         verify(contactService, never()).createNaturalContact(any(CreateNaturalContactRequest.class), any(User.class));
+    }
+
+    @Test
+    void contactEditFormIsProtectedAndRendersIdentityAsReadonlyWithCsrf() throws Exception {
+        User seller = actor("seller-edit", Role.VENDEDOR);
+        Contact contact = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), seller);
+        contact.addCommercialType(CommercialType.CLIENTE);
+        contact.addPhone(new com.gestorcontactos.gestor_contactos.entity.ContactPhone(
+                com.gestorcontactos.gestor_contactos.entity.PhoneType.CELULAR, "", "987654321"));
+        contact.addEmail(new com.gestorcontactos.gestor_contactos.entity.ContactEmail("maria@example.com"));
+        when(contactService.getContactForEditing(51L, seller)).thenReturn(contact);
+
+        mockMvc.perform(get("/contactos/51/editar").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contacts/edit"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("readonly")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("987654321")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("maria@example.com")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")));
+
+        mockMvc.perform(get("/contactos/51/editar").with(user(new CustomUserDetails(actor("warehouse-edit", Role.ALMACENERO)))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void editPostRequiresCsrfAndIgnoresIdentityFieldsSentByClient() throws Exception {
+        User seller = actor("seller-update", Role.VENDEDOR);
+        Contact contact = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), seller);
+        contact.addCommercialType(CommercialType.CLIENTE);
+        when(contactService.getContactForEditing(52L, seller)).thenReturn(contact);
+
+        mockMvc.perform(post("/contactos/52/editar").with(user(new CustomUserDetails(seller)))
+                        .param("address", "Jr. Nueva 456")
+                        .param("firstNames", "Manipulado")
+                        .param("documentNumber", "87654321"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/contactos/52/editar").with(user(new CustomUserDetails(seller))).with(csrf())
+                        .param("address", "Jr. Nueva 456")
+                        .param("firstNames", "Manipulado")
+                        .param("documentNumber", "87654321"))
+                .andExpect(status().is3xxRedirection());
+
+        var requestCaptor = forClass(EditContactRequest.class);
+        verify(contactService).updateEditableData(eq(52L), requestCaptor.capture(), eq(seller));
+        assertEquals(new EditContactRequest("Jr. Nueva 456"), requestCaptor.getValue());
+    }
+
+    @Test
+    void warehouseCannotPostContactEditsEvenWithCsrf() throws Exception {
+        User warehouse = actor("warehouse-update", Role.ALMACENERO);
+        mockMvc.perform(post("/contactos/53/telefonos").with(user(new CustomUserDetails(warehouse))).with(csrf())
+                        .param("phoneType", "CELULAR").param("areaCode", "").param("phoneNumber", "987654321"))
+                .andExpect(status().isForbidden());
+        verify(contactService, never()).addPhone(eq(53L), any(), any(User.class));
     }
 
     @Test

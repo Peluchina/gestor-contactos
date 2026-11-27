@@ -1,13 +1,19 @@
 package com.gestorcontactos.gestor_contactos.controller;
 
 import com.gestorcontactos.gestor_contactos.dto.ContactDetailsView;
+import com.gestorcontactos.gestor_contactos.dto.ContactEditView;
+import com.gestorcontactos.gestor_contactos.dto.ContactEmailEditView;
+import com.gestorcontactos.gestor_contactos.dto.ContactEmailRequest;
 import com.gestorcontactos.gestor_contactos.dto.ContactIdentityLookupView;
 import com.gestorcontactos.gestor_contactos.dto.ContactListItem;
+import com.gestorcontactos.gestor_contactos.dto.ContactPhoneEditView;
+import com.gestorcontactos.gestor_contactos.dto.ContactPhoneRequest;
 import com.gestorcontactos.gestor_contactos.dto.ContactPhoneView;
 import com.gestorcontactos.gestor_contactos.dto.CreateContactEmailRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateContactPhoneRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.EditContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.WarehouseContactDetailsView;
 import com.gestorcontactos.gestor_contactos.dto.WarehouseContactListItem;
 import com.gestorcontactos.gestor_contactos.entity.CommercialType;
@@ -172,9 +178,85 @@ public class ContactController {
         } else {
             model.addAttribute("contact", toDetailsView(contact));
             model.addAttribute("restrictedView", false);
+            model.addAttribute("canEdit", true);
             addRelationActions(model, actor.getRole(), contact);
         }
         return "contacts/detail";
+    }
+
+    @GetMapping("/contactos/{id}/editar")
+    public String editContactForm(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
+        User actor = authenticatedUser(currentUser);
+        return populateEditModel(id, actor, model, null, null, null);
+    }
+
+    @PostMapping("/contactos/{id}/editar")
+    public String updateContact(@PathVariable Long id,
+            @ModelAttribute("form") EditContactRequest form, BindingResult bindingResult,
+            @AuthenticationPrincipal CustomUserDetails currentUser, Model model,
+            RedirectAttributes redirectAttributes) {
+        User actor = authenticatedUser(currentUser);
+        if (bindingResult.hasErrors()) {
+            return populateEditModel(id, actor, model, form, null, null);
+        }
+        try {
+            contactService.updateEditableData(id, form, actor);
+            redirectAttributes.addFlashAttribute("success", "Datos del contacto actualizados correctamente.");
+            return "redirect:/contactos/" + id + "/editar";
+        } catch (ContactBusinessException exception) {
+            bindingResult.reject("contactEdit", exception.getMessage());
+            try {
+                return populateEditModel(id, actor, model, form, null, null);
+            } catch (ContactBusinessException missingContact) {
+                redirectAttributes.addFlashAttribute("error", exception.getMessage());
+                return "redirect:/contactos";
+            }
+        }
+    }
+
+    @PostMapping("/contactos/{id}/telefonos")
+    public String addPhone(@PathVariable Long id, @ModelAttribute("phoneForm") ContactPhoneRequest form,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.addPhone(id, form, actor), "Teléfono agregado correctamente.");
+    }
+
+    @PostMapping("/contactos/{id}/telefonos/{phoneId}/editar")
+    public String updatePhone(@PathVariable Long id, @PathVariable Long phoneId,
+            @ModelAttribute("phoneForm") ContactPhoneRequest form,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.updatePhone(id, phoneId, form, actor), "Teléfono actualizado correctamente.");
+    }
+
+    @PostMapping("/contactos/{id}/telefonos/{phoneId}/eliminar")
+    public String removePhone(@PathVariable Long id, @PathVariable Long phoneId,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.removePhone(id, phoneId, actor), "Teléfono eliminado correctamente.");
+    }
+
+    @PostMapping("/contactos/{id}/correos")
+    public String addEmail(@PathVariable Long id, @ModelAttribute("emailForm") ContactEmailRequest form,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.addEmail(id, form, actor), "Correo agregado correctamente.");
+    }
+
+    @PostMapping("/contactos/{id}/correos/{emailId}/editar")
+    public String updateEmail(@PathVariable Long id, @PathVariable Long emailId,
+            @ModelAttribute("emailForm") ContactEmailRequest form,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.updateEmail(id, emailId, form, actor), "Correo actualizado correctamente.");
+    }
+
+    @PostMapping("/contactos/{id}/correos/{emailId}/eliminar")
+    public String removeEmail(@PathVariable Long id, @PathVariable Long emailId,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.removeEmail(id, emailId, actor), "Correo eliminado correctamente.");
     }
 
     @PostMapping("/contactos/{id}/relaciones/cliente")
@@ -198,6 +280,28 @@ public class ContactController {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
         return "redirect:/contactos";
+    }
+
+    private String applyContactChange(Long contactId, CustomUserDetails currentUser,
+            RedirectAttributes redirectAttributes, ContactChange operation, String successMessage) {
+        try {
+            operation.apply(authenticatedUser(currentUser));
+            redirectAttributes.addFlashAttribute("success", successMessage);
+        } catch (ContactBusinessException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/contactos/" + contactId + "/editar";
+    }
+
+    private String populateEditModel(Long id, User actor, Model model,
+            EditContactRequest form, ContactPhoneRequest phoneForm, ContactEmailRequest emailForm) {
+        Contact contact = contactService.getContactForEditing(id, actor);
+        model.addAttribute("contact", toEditView(contact));
+        model.addAttribute("form", form == null ? new EditContactRequest(contact.getAddress()) : form);
+        model.addAttribute("phoneForm", phoneForm == null
+                ? new ContactPhoneRequest(PhoneType.CELULAR, "", "") : phoneForm);
+        model.addAttribute("emailForm", emailForm == null ? new ContactEmailRequest("") : emailForm);
+        return "contacts/edit";
     }
 
     private User authenticatedUser(CustomUserDetails currentUser) {
@@ -280,6 +384,20 @@ public class ContactController {
                 Set.copyOf(contact.getCommercialTypes()), phones, emails);
     }
 
+    private ContactEditView toEditView(Contact contact) {
+        List<ContactPhoneEditView> phones = contact.getPhones().stream()
+                .map(phone -> new ContactPhoneEditView(phone.getId(), phone.getPhoneType(),
+                        phone.getAreaCode(), phone.getPhoneNumber()))
+                .toList();
+        List<ContactEmailEditView> emails = contact.getEmails().stream()
+                .map(email -> new ContactEmailEditView(email.getId(), email.getEmail()))
+                .toList();
+        return new ContactEditView(contact.getId(), contact.getPersonType(), contact.getFirstNames(),
+                contact.getLastNames(), contact.getLegalName(), contact.getDocumentType(),
+                contact.getDocumentNumber(), contact.getAddress(), contact.getStatus(),
+                Set.copyOf(contact.getCommercialTypes()), phones, emails);
+    }
+
     private WarehouseContactDetailsView toWarehouseDetails(Contact contact) {
         return new WarehouseContactDetailsView(contact.getId(), contact.getPersonType(), displayName(contact),
                 contact.getAddress());
@@ -317,5 +435,10 @@ public class ContactController {
         return new CreateLegalContactRequest("", DocumentType.RUC, "", "",
                 List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "")),
                 List.of(new CreateContactEmailRequest("")), Set.of(CommercialType.PROVEEDOR));
+    }
+
+    @FunctionalInterface
+    private interface ContactChange {
+        Contact apply(User actor);
     }
 }

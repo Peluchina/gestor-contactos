@@ -103,6 +103,27 @@ class ContactControllerSecurityTest {
     }
 
     @Test
+    void naturalContactFormSubmitsMultiplePhonesAndEmails() throws Exception {
+        User seller = actor("seller-multiple-values", Role.VENDEDOR);
+        mockNaturalCreation(seller, Set.of(CommercialType.CLIENTE));
+
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller))).with(csrf())
+                        .params(validNaturalParameters())
+                        .param("phones[1].phoneType", "FIJO")
+                        .param("phones[1].areaCode", "01")
+                        .param("phones[1].phoneNumber", "4567890")
+                        .param("emails[1].email", "second@example.com")
+                        .param("commercialTypes", "CLIENTE"))
+                .andExpect(status().is3xxRedirection());
+
+        var requestCaptor = forClass(CreateNaturalContactRequest.class);
+        verify(contactService).createNaturalContact(requestCaptor.capture(), eq(seller));
+        assertEquals(2, requestCaptor.getValue().phones().size());
+        assertEquals(2, requestCaptor.getValue().emails().size());
+        assertEquals("second@example.com", requestCaptor.getValue().emails().get(1).email());
+    }
+
+    @Test
     void purchasingCanCreateSupplierButCannotCreateClient() throws Exception {
         User buyer = actor("buyer", Role.COMPRAS);
         mockLegalCreation(buyer, Set.of(CommercialType.PROVEEDOR));
@@ -200,6 +221,9 @@ class ContactControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("contacts/create-natural"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("multipart/form-data")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("phones[0].phoneNumber")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("emails[0].email")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("contact-collections.js")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")));
 
         mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller)))
@@ -443,10 +467,35 @@ class ContactControllerSecurityTest {
                 .andExpect(view().name("contacts/list"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("María Pérez")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Av. Perú 123")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("ACTIVO")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("12345678"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Documento"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Teléfonos"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Correos"))));
+    }
+
+    @Test
+    void warehouseDetailContainsOnlyNameAndAddress() throws Exception {
+        User warehouse = actor("warehouse-detail-private", Role.ALMACENERO);
+        Contact contact = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), warehouse);
+        contact.addCommercialType(CommercialType.CLIENTE);
+        contact.addPhone(new com.gestorcontactos.gestor_contactos.entity.ContactPhone(
+                com.gestorcontactos.gestor_contactos.entity.PhoneType.CELULAR, "", "987654321"));
+        contact.addEmail(new com.gestorcontactos.gestor_contactos.entity.ContactEmail("private@example.com"));
+        contact.setPhotoPath("uploads/contacts/private.jpg");
+        when(contactService.findById(87L)).thenReturn(Optional.of(contact));
+
+        mockMvc.perform(get("/contactos/87").with(user(new CustomUserDetails(warehouse))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("María Pérez")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Av. Perú 123")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("12345678"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("987654321"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("private@example.com"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Auditoría"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<img"))));
     }
 
     @Test
@@ -537,12 +586,43 @@ class ContactControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("contacts/detail"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Contacto eliminado lógicamente.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Auditoría")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("admin-deleted-detail")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/contactos/84/recuperar")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("/contactos/84/eliminar"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("/contactos/84/editar"))));
+    }
+
+    @Test
+    void sellerCanSearchActiveClientsWithoutSeeingContactsOutsideItsScope() throws Exception {
+        User seller = actor("seller-search", Role.VENDEDOR);
+        Contact client = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), seller);
+        client.addCommercialType(CommercialType.CLIENTE);
+        setEntityId(client, 86L);
+        when(contactService.findByIdentity(DocumentType.DNI, "12345678")).thenReturn(Optional.of(client));
+
+        mockMvc.perform(get("/contactos/buscar").with(user(new CustomUserDetails(seller)))
+                        .param("documentType", "DNI").param("documentNumber", "12345678"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("María Pérez")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/contactos/86")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"12345678\"")));
+
+        Contact supplier = new Contact(PersonType.NATURAL, "Persona privada", "Proveedor", DocumentType.DNI,
+                "87654321", "Av. Privada 1", LocalDateTime.now(), seller);
+        supplier.addCommercialType(CommercialType.PROVEEDOR);
+        when(contactService.findByIdentity(DocumentType.DNI, "87654321")).thenReturn(Optional.of(supplier));
+        mockMvc.perform(get("/contactos/buscar").with(user(new CustomUserDetails(seller)))
+                        .param("documentType", "DNI").param("documentNumber", "87654321"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "La identidad ya está registrada y no se puede crear un contacto duplicado.")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Persona privada"))));
     }
 
     private void mockNaturalCreation(User actor, Set<CommercialType> commercialTypes) {

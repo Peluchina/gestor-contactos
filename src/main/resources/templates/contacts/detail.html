@@ -40,6 +40,14 @@
                 th:text="${phone.phoneType + ' ' + phone.areaCode + ' ' + phone.phoneNumber}"></li></ul>
         <h2>Correos electrónicos</h2>
         <ul><li th:each="email : ${contact.emails}" th:text="${email}"></li></ul>
+        <section th:if="${isAdministrator}" aria-labelledby="audit-title">
+            <h2 id="audit-title">Auditoría</h2>
+            <p>Creado: <time th:text="${createdAt}"></time> por <span th:text="${createdBy}"></span></p>
+            <p th:if="${updatedAt}">Actualizado: <time th:text="${updatedAt}"></time>
+                por <span th:text="${updatedBy}"></span></p>
+            <p th:if="${deletedAt}">Eliminado: <time th:text="${deletedAt}"></time>
+                por <span th:text="${deletedBy}"></span></p>
+        </section>
         <form th:if="${canAddClient and !clientAlreadyAssigned}"
               th:action="@{/contactos/{id}/relaciones/cliente(id=${contact.id})}" method="post">
             <button type="submit">Agregar CLIENTE</button>

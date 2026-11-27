@@ -12,26 +12,23 @@
     <form th:action="@{/contactos/buscar}" method="get">
         <label>Tipo de documento
             <select name="documentType" required>
-                <option value="DNI">DNI</option>
-                <option value="CARNET_EXTRANJERIA">Carnet de Extranjería</option>
-                <option value="RUC">RUC</option>
+                <option value="DNI" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).DNI}">DNI</option>
+                <option value="CARNET_EXTRANJERIA" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).CARNET_EXTRANJERIA}">Carnet de Extranjería</option>
+                <option value="RUC" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).RUC}">RUC</option>
             </select>
         </label>
-        <label>Número <input name="documentNumber" type="text" required></label>
+        <label>Número <input name="documentNumber" type="text" th:value="${searchedDocumentNumber}" required></label>
         <button type="submit">Buscar</button>
     </form>
     <p th:if="${resultMessage}" th:text="${resultMessage}" role="status"></p>
     <section th:if="${contact}">
         <h2 th:text="${contact.displayName}"></h2>
         <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
-        <p th:if="${restrictedView}">Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
-        <p th:if="${restrictedView}">Estado: <span th:text="${contact.status}"></span></p>
-        <p th:if="${restrictedView}">Relaciones: <span th:text="${contact.commercialTypes}"></span></p>
-        <p th:unless="${restrictedView}">Dirección: <span th:text="${contact.address}"></span></p>
-        <p th:unless="${restrictedView}">Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
-        <p th:unless="${restrictedView}">Estado: <span th:text="${contact.status}"></span></p>
-        <p th:unless="${restrictedView}">Relaciones: <span th:text="${contact.commercialTypes}"></span></p>
-        <a th:if="${!restrictedView}" th:href="@{/contactos/{id}(id=${contact.id})}">Consultar detalle</a>
+        <p th:if="${!restrictedView}">Dirección: <span th:text="${contact.address}"></span></p>
+        <p>Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
+        <p>Estado: <span th:text="${contact.status}"></span></p>
+        <p>Relaciones: <span th:text="${contact.commercialTypes}"></span></p>
+        <a th:if="${canViewDetails}" th:href="@{/contactos/{id}(id=${contact.id})}">Consultar detalle</a>
         <form th:if="${canAddClient and !clientAlreadyAssigned}"
               th:action="@{/contactos/{id}/relaciones/cliente(id=${contact.id})}" method="post">
             <button type="submit">Agregar CLIENTE</button>

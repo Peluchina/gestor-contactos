@@ -27,17 +27,41 @@
             <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
         </label>
         <fieldset>
-            <legend>Teléfono</legend>
-            <label>Tipo
-                <select th:field="*{phones[0].phoneType}" required>
-                    <option value="CELULAR">Celular</option>
-                    <option value="FIJO">Fijo</option>
-                </select>
-            </label>
-            <label>Código de área <input type="text" th:field="*{phones[0].areaCode}"></label>
-            <label>Número <input type="text" th:field="*{phones[0].phoneNumber}" required></label>
+            <legend>Teléfonos</legend>
+            <div id="phone-rows" data-collection="phones">
+                <fieldset th:each="phone, item : ${form.phones}" data-row>
+                    <legend th:text="${'Teléfono ' + (item.index + 1)}"></legend>
+                    <label th:for="${'phone-type-' + item.index}">Tipo</label>
+                    <select th:id="${'phone-type-' + item.index}"
+                            th:name="${'phones[' + item.index + '].phoneType'}" required>
+                        <option value="CELULAR" th:selected="${phone.phoneType == T(com.gestorcontactos.gestor_contactos.entity.PhoneType).CELULAR}">Celular</option>
+                        <option value="FIJO" th:selected="${phone.phoneType == T(com.gestorcontactos.gestor_contactos.entity.PhoneType).FIJO}">Fijo</option>
+                    </select>
+                    <label th:for="${'phone-area-' + item.index}">Código de área</label>
+                    <input type="text" th:id="${'phone-area-' + item.index}"
+                           th:name="${'phones[' + item.index + '].areaCode'}" th:value="${phone.areaCode}">
+                    <label th:for="${'phone-number-' + item.index}">Número</label>
+                    <input type="text" th:id="${'phone-number-' + item.index}"
+                           th:name="${'phones[' + item.index + '].phoneNumber'}"
+                           th:value="${phone.phoneNumber}" required>
+                    <button type="button" data-remove-row>Quitar teléfono</button>
+                </fieldset>
+            </div>
+            <button type="button" data-add-row="phone-rows">Agregar teléfono</button>
         </fieldset>
-        <label>Correo electrónico <input type="email" th:field="*{emails[0].email}" required></label>
+        <fieldset>
+            <legend>Correos electrónicos</legend>
+            <div id="email-rows" data-collection="emails">
+                <fieldset th:each="email, item : ${form.emails}" data-row>
+                    <legend th:text="${'Correo ' + (item.index + 1)}"></legend>
+                    <label th:for="${'email-' + item.index}">Correo electrónico</label>
+                    <input type="email" th:id="${'email-' + item.index}"
+                           th:name="${'emails[' + item.index + '].email'}" th:value="${email.email}" required>
+                    <button type="button" data-remove-row>Quitar correo</button>
+                </fieldset>
+            </div>
+            <button type="button" data-add-row="email-rows">Agregar correo electrónico</button>
+        </fieldset>
         <label>Relaciones comerciales
             <select th:field="*{commercialTypes}" multiple required>
                 <option th:each="type : ${commercialTypes}" th:value="${type}" th:text="${type}"></option>
@@ -46,5 +70,6 @@
         <button type="submit">Crear contacto</button>
     </form>
 </main>
+<script th:src="@{/js/contact-collections.js}" defer></script>
 </body>
 </html>

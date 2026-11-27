@@ -159,6 +159,8 @@ public class ContactController {
             @AuthenticationPrincipal CustomUserDetails currentUser,
             Model model) {
         User actor = authenticatedUser(currentUser);
+        model.addAttribute("searchedDocumentType", documentType);
+        model.addAttribute("searchedDocumentNumber", documentNumber);
         if (documentType == null || documentNumber == null || documentNumber.isBlank()) {
             return "contacts/search-result";
         }
@@ -177,9 +179,21 @@ public class ContactController {
         if (actor.getRole() == Role.ADMINISTRADOR) {
             model.addAttribute("contact", toDetailsView(contact));
             model.addAttribute("restrictedView", false);
+            model.addAttribute("canViewDetails", true);
         } else {
+            boolean withinRoleScope = contact.getStatus() == ContactStatus.ACTIVO
+                    && (actor.getRole() == Role.VENDEDOR
+                            && contact.getCommercialTypes().contains(CommercialType.CLIENTE)
+                    || actor.getRole() == Role.COMPRAS
+                            && contact.getCommercialTypes().contains(CommercialType.PROVEEDOR));
+            if (!withinRoleScope) {
+                model.addAttribute("resultMessage",
+                        "La identidad ya está registrada y no se puede crear un contacto duplicado.");
+                return "contacts/search-result";
+            }
             model.addAttribute("contact", toIdentityLookupView(contact));
             model.addAttribute("restrictedView", true);
+            model.addAttribute("canViewDetails", true);
         }
         addRelationActions(model, actor.getRole(), contact);
         return "contacts/search-result";
@@ -210,6 +224,17 @@ public class ContactController {
             model.addAttribute("photoUrl", !deleted && contact.getPhotoPath() != null
                     ? "/contactos/" + id + "/foto" : null);
             model.addAttribute("showPhotoMissing", !deleted && contact.getPhotoPath() == null);
+            model.addAttribute("isAdministrator", actor.getRole() == Role.ADMINISTRADOR);
+            if (actor.getRole() == Role.ADMINISTRADOR) {
+                model.addAttribute("createdAt", contact.getCreatedAt());
+                model.addAttribute("createdBy", contact.getCreatedBy().getUsername());
+                model.addAttribute("updatedAt", contact.getUpdatedAt());
+                model.addAttribute("updatedBy", contact.getUpdatedBy() == null
+                        ? null : contact.getUpdatedBy().getUsername());
+                model.addAttribute("deletedAt", contact.getDeletedAt());
+                model.addAttribute("deletedBy", contact.getDeletedBy() == null
+                        ? null : contact.getDeletedBy().getUsername());
+            }
             if (!deleted) {
                 addRelationActions(model, actor.getRole(), contact);
             } else {

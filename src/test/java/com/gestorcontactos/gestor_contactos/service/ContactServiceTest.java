@@ -27,6 +27,7 @@ import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
+import com.gestorcontactos.gestor_contactos.service.ContactPhotoStorageService;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -46,12 +47,15 @@ class ContactServiceTest {
     @Mock
     private ContactRepository contactRepository;
 
+    @Mock
+    private ContactPhotoStorageService photoStorageService;
+
     private ContactService contactService;
     private User administrator;
 
     @BeforeEach
     void setUp() {
-        contactService = new ContactService(contactRepository, new ContactValidator());
+        contactService = new ContactService(contactRepository, new ContactValidator(), photoStorageService);
         administrator = user(Role.ADMINISTRADOR);
     }
 

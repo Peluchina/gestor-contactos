@@ -28,6 +28,7 @@ import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetails;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetailsService;
 import com.gestorcontactos.gestor_contactos.service.ContactService;
+import com.gestorcontactos.gestor_contactos.service.ContactPhotoStorageService;
 import com.gestorcontactos.gestor_contactos.service.UserService;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -49,6 +50,9 @@ class ContactControllerSecurityTest {
 
     @MockitoBean
     private ContactService contactService;
+
+    @MockitoBean
+    private ContactPhotoStorageService photoStorageService;
 
     @MockitoBean
     private UserService userService;
@@ -193,6 +197,7 @@ class ContactControllerSecurityTest {
         mockMvc.perform(get("/contactos/nuevo/natural").with(user(new CustomUserDetails(seller))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("contacts/create-natural"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("multipart/form-data")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")));
 
         mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller)))
@@ -255,6 +260,98 @@ class ContactControllerSecurityTest {
                         .param("phoneType", "CELULAR").param("areaCode", "").param("phoneNumber", "987654321"))
                 .andExpect(status().isForbidden());
         verify(contactService, never()).addPhone(eq(53L), any(), any(User.class));
+    }
+
+    @Test
+    void photoEndpointsRequireCsrfAndRejectWarehouseRole() throws Exception {
+        User administrator = actor("admin-photo", Role.ADMINISTRADOR);
+        User warehouse = actor("warehouse-photo", Role.ALMACENERO);
+        org.springframework.mock.web.MockMultipartFile photo = new org.springframework.mock.web.MockMultipartFile(
+                "photo", "valid.jpg", "image/jpeg", new byte[] {1, 2, 3});
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .multipart("/contactos/61/foto").file(photo)
+                        .with(user(new CustomUserDetails(administrator))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .multipart("/contactos/61/foto").file(photo)
+                        .with(user(new CustomUserDetails(warehouse))).with(csrf()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .multipart("/contactos/61/foto").file(photo)
+                        .with(user(new CustomUserDetails(administrator))).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+
+        verify(contactService).replacePhoto(eq(61L), any(org.springframework.web.multipart.MultipartFile.class),
+                eq(administrator));
+        verify(contactService, never()).replacePhoto(eq(61L), any(), eq(warehouse));
+    }
+
+    @Test
+    void photoResourceRequiresAuthenticationAndUsesStoredImageReference() throws Exception {
+        User seller = actor("seller-photo-view", Role.VENDEDOR);
+        String photoPath = "uploads/contacts/00000000-0000-0000-0000-000000000001.png";
+        when(contactService.getPhotoPathForViewing(64L, seller)).thenReturn(photoPath);
+        when(photoStorageService.loadResource(photoPath))
+                .thenReturn(new org.springframework.core.io.ByteArrayResource(new byte[] {1, 2, 3}));
+        when(photoStorageService.mediaType(photoPath)).thenReturn(org.springframework.http.MediaType.IMAGE_PNG);
+
+        mockMvc.perform(get("/contactos/64/foto"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+        mockMvc.perform(get("/contactos/64/foto").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/png"))
+                .andExpect(content().bytes(new byte[] {1, 2, 3}));
+    }
+
+    @Test
+    void contactDetailShowsPhotoOnlyToRolesWithFullContactView() throws Exception {
+        User seller = actor("seller-detail-photo", Role.VENDEDOR);
+        Contact contact = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), seller);
+        contact.setPhotoPath("uploads/contacts/00000000-0000-0000-0000-000000000002.jpg");
+        contact.addCommercialType(CommercialType.CLIENTE);
+        when(contactService.findById(65L)).thenReturn(Optional.of(contact));
+
+        mockMvc.perform(get("/contactos/65").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/contactos/65/foto")));
+
+        User warehouse = actor("warehouse-detail-photo", Role.ALMACENERO);
+        mockMvc.perform(get("/contactos/65").with(user(new CustomUserDetails(warehouse))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<img"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("foto"))));
+    }
+
+    @Test
+    void authenticatedActorCanCreateContactWithOptionalPhoto() throws Exception {
+        User admin = actor("admin-create-photo", Role.ADMINISTRADOR);
+        Contact created = org.mockito.Mockito.mock(Contact.class);
+        when(created.getId()).thenReturn(62L);
+        when(contactService.createNaturalContact(any(CreateNaturalContactRequest.class), eq(admin),
+                any(org.springframework.web.multipart.MultipartFile.class))).thenReturn(created);
+        org.springframework.mock.web.MockMultipartFile photo = new org.springframework.mock.web.MockMultipartFile(
+                "photo", "image.png", "image/png", new byte[] {1, 2, 3});
+        org.springframework.mock.web.MockMultipartFile form = new org.springframework.mock.web.MockMultipartFile(
+                "form", "", "text/plain", "".getBytes());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .multipart("/contactos/natural").file(photo).file(form).with(csrf())
+                        .with(user(new CustomUserDetails(admin)))
+                        .param("firstNames", "María").param("lastNames", "Pérez")
+                        .param("documentType", "DNI").param("documentNumber", "12345678")
+                        .param("address", "Av. Perú 123")
+                        .param("phones[0].phoneType", "CELULAR").param("phones[0].areaCode", "")
+                        .param("phones[0].phoneNumber", "987654321")
+                        .param("emails[0].email", "maria@example.com")
+                        .param("commercialTypes", "CLIENTE"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos/62"));
+
+        verify(contactService).createNaturalContact(any(CreateNaturalContactRequest.class), eq(admin),
+                any(org.springframework.web.multipart.MultipartFile.class));
     }
 
     @Test

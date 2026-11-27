@@ -27,7 +27,9 @@ import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetails;
 import com.gestorcontactos.gestor_contactos.service.ContactService;
+import com.gestorcontactos.gestor_contactos.service.ContactPhotoStorageService;
 import com.gestorcontactos.gestor_contactos.service.UserService;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,6 +38,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -45,16 +50,20 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class ContactController {
 
     private final ContactService contactService;
+    private final ContactPhotoStorageService photoStorageService;
     private final UserService userService;
 
-    public ContactController(ContactService contactService, UserService userService) {
+    public ContactController(ContactService contactService, ContactPhotoStorageService photoStorageService,
+            UserService userService) {
         this.contactService = contactService;
+        this.photoStorageService = photoStorageService;
         this.userService = userService;
     }
 
@@ -87,6 +96,7 @@ public class ContactController {
     @PostMapping("/contactos/natural")
     public String createNaturalContact(@ModelAttribute("form") CreateNaturalContactRequest form,
             BindingResult bindingResult, @AuthenticationPrincipal CustomUserDetails currentUser,
+            @RequestParam(value = "photo", required = false) MultipartFile photo,
             Model model, RedirectAttributes redirectAttributes) {
         User actor = authenticatedUser(currentUser);
         if (bindingResult.hasErrors()) {
@@ -94,7 +104,8 @@ public class ContactController {
             return "contacts/create-natural";
         }
         try {
-            Contact contact = contactService.createNaturalContact(form, actor);
+            Contact contact = photo == null ? contactService.createNaturalContact(form, actor)
+                    : contactService.createNaturalContact(form, actor, photo);
             redirectAttributes.addFlashAttribute("success", "Contacto creado correctamente.");
             return "redirect:/contactos/" + contact.getId();
         } catch (ContactBusinessException exception) {
@@ -115,6 +126,7 @@ public class ContactController {
     @PostMapping("/contactos/juridica")
     public String createLegalContact(@ModelAttribute("form") CreateLegalContactRequest form,
             BindingResult bindingResult, @AuthenticationPrincipal CustomUserDetails currentUser,
+            @RequestParam(value = "photo", required = false) MultipartFile photo,
             Model model, RedirectAttributes redirectAttributes) {
         User actor = authenticatedUser(currentUser);
         if (bindingResult.hasErrors()) {
@@ -122,7 +134,8 @@ public class ContactController {
             return "contacts/create-legal";
         }
         try {
-            Contact contact = contactService.createLegalContact(form, actor);
+            Contact contact = photo == null ? contactService.createLegalContact(form, actor)
+                    : contactService.createLegalContact(form, actor, photo);
             redirectAttributes.addFlashAttribute("success", "Contacto creado correctamente.");
             return "redirect:/contactos/" + contact.getId();
         } catch (ContactBusinessException exception) {
@@ -179,6 +192,7 @@ public class ContactController {
             model.addAttribute("contact", toDetailsView(contact));
             model.addAttribute("restrictedView", false);
             model.addAttribute("canEdit", true);
+            model.addAttribute("photoUrl", contact.getPhotoPath() == null ? null : "/contactos/" + id + "/foto");
             addRelationActions(model, actor.getRole(), contact);
         }
         return "contacts/detail";
@@ -259,6 +273,36 @@ public class ContactController {
                 actor -> contactService.removeEmail(id, emailId, actor), "Correo eliminado correctamente.");
     }
 
+    @GetMapping("/contactos/{id}/foto")
+    public ResponseEntity<Resource> contactPhoto(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser) throws IOException {
+        User actor = authenticatedUser(currentUser);
+        String photoPath = contactService.getPhotoPathForViewing(id, actor);
+        if (photoPath == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Resource photo = photoStorageService.loadResource(photoPath);
+        return ResponseEntity.ok()
+                .contentType(photoStorageService.mediaType(photoPath))
+                .cacheControl(CacheControl.noCache())
+                .body(photo);
+    }
+
+    @PostMapping("/contactos/{id}/foto")
+    public String replacePhoto(@PathVariable Long id,
+            @RequestParam("photo") MultipartFile photo,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.replacePhoto(id, photo, actor), "Fotografía actualizada correctamente.");
+    }
+
+    @PostMapping("/contactos/{id}/foto/eliminar")
+    public String removePhoto(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        return applyContactChange(id, currentUser, redirectAttributes,
+                actor -> contactService.removePhoto(id, actor), "Fotografía eliminada correctamente.");
+    }
+
     @PostMapping("/contactos/{id}/relaciones/cliente")
     public String addClientRelation(@PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
@@ -297,6 +341,7 @@ public class ContactController {
             EditContactRequest form, ContactPhoneRequest phoneForm, ContactEmailRequest emailForm) {
         Contact contact = contactService.getContactForEditing(id, actor);
         model.addAttribute("contact", toEditView(contact));
+        model.addAttribute("photoUrl", contact.getPhotoPath() == null ? null : "/contactos/" + id + "/foto");
         model.addAttribute("form", form == null ? new EditContactRequest(contact.getAddress()) : form);
         model.addAttribute("phoneForm", phoneForm == null
                 ? new ContactPhoneRequest(PhoneType.CELULAR, "", "") : phoneForm);

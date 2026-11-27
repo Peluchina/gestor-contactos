@@ -38,12 +38,16 @@ public class SecurityConfig {
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
                         .requestMatchers(HttpMethod.GET, "/contactos/*/editar")
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.GET, "/contactos/*/foto")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
                         .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/cliente")
                                 .hasAnyRole("ADMINISTRADOR", "VENDEDOR")
                         .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/proveedor")
                                 .hasAnyRole("ADMINISTRADOR", "COMPRAS")
                         .requestMatchers(HttpMethod.POST,
                                 "/contactos/*/editar",
+                                "/contactos/*/foto",
+                                "/contactos/*/foto/eliminar",
                                 "/contactos/*/telefonos",
                                 "/contactos/*/telefonos/*/editar",
                                 "/contactos/*/telefonos/*/eliminar",

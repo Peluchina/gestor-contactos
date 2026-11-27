@@ -9,7 +9,7 @@
 <main>
     <h1>Crear persona natural</h1>
     <a th:href="@{/contactos}">Volver a contactos</a>
-    <form th:action="@{/contactos/natural}" th:object="${form}" method="post">
+    <form th:action="@{/contactos/natural}" th:object="${form}" method="post" enctype="multipart/form-data">
         <div th:if="${#fields.hasGlobalErrors()}" role="alert">
             <p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
         </div>
@@ -23,6 +23,9 @@
         </label>
         <label>Número de documento <input type="text" th:field="*{documentNumber}" required></label>
         <label>Dirección <input type="text" th:field="*{address}" required></label>
+        <label>Fotografía (opcional)
+            <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+        </label>
         <fieldset>
             <legend>Teléfono</legend>
             <label>Tipo

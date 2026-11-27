@@ -19,6 +19,9 @@ import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -33,34 +36,71 @@ public class ContactService {
 
     private final ContactRepository contactRepository;
     private final ContactValidator contactValidator;
+    private final ContactPhotoStorageService photoStorageService;
 
-    public ContactService(ContactRepository contactRepository, ContactValidator contactValidator) {
+    public ContactService(ContactRepository contactRepository, ContactValidator contactValidator,
+            ContactPhotoStorageService photoStorageService) {
         this.contactRepository = contactRepository;
         this.contactValidator = contactValidator;
+        this.photoStorageService = photoStorageService;
     }
 
     @Transactional
     public Contact createNaturalContact(CreateNaturalContactRequest request, User createdBy) {
-        CreateNaturalContactRequest valid = contactValidator.normalizeAndValidate(request);
-        validateCreatorAndPermissions(createdBy, valid.commercialTypes());
-        ensureIdentityIsNew(valid.documentType(), valid.documentNumber());
+        return createNaturalContact(request, createdBy, null);
+    }
 
-        Contact contact = new Contact(PersonType.NATURAL, valid.firstNames(), valid.lastNames(),
-                valid.documentType(), valid.documentNumber(), valid.address(), LocalDateTime.now(), createdBy);
-        addChildrenAndCommercialTypes(contact, valid.phones(), valid.emails(), valid.commercialTypes());
-        return save(contact);
+    @Transactional
+    public Contact createNaturalContact(CreateNaturalContactRequest request, User createdBy, MultipartFile photo) {
+        String photoPath = isPhotoNotProvided(photo) ? null : photoStorageService.store(photo);
+        if (photoPath != null) {
+            scheduleDeleteOnRollback(photoPath);
+        }
+        try {
+            CreateNaturalContactRequest valid = contactValidator.normalizeAndValidate(request);
+            validateCreatorAndPermissions(createdBy, valid.commercialTypes());
+            ensureIdentityIsNew(valid.documentType(), valid.documentNumber());
+
+            Contact contact = new Contact(PersonType.NATURAL, valid.firstNames(), valid.lastNames(),
+                    valid.documentType(), valid.documentNumber(), valid.address(), LocalDateTime.now(), createdBy);
+            contact.setPhotoPath(photoPath);
+            addChildrenAndCommercialTypes(contact, valid.phones(), valid.emails(), valid.commercialTypes());
+            return save(contact);
+        } catch (RuntimeException exception) {
+            if (photoPath != null) {
+                deleteImmediately(photoPath);
+            }
+            throw exception;
+        }
     }
 
     @Transactional
     public Contact createLegalContact(CreateLegalContactRequest request, User createdBy) {
-        CreateLegalContactRequest valid = contactValidator.normalizeAndValidate(request);
-        validateCreatorAndPermissions(createdBy, valid.commercialTypes());
-        ensureIdentityIsNew(valid.documentType(), valid.documentNumber());
+        return createLegalContact(request, createdBy, null);
+    }
 
-        Contact contact = new Contact(PersonType.JURIDICA, valid.legalName(), valid.documentType(),
-                valid.documentNumber(), valid.address(), LocalDateTime.now(), createdBy);
-        addChildrenAndCommercialTypes(contact, valid.phones(), valid.emails(), valid.commercialTypes());
-        return save(contact);
+    @Transactional
+    public Contact createLegalContact(CreateLegalContactRequest request, User createdBy, MultipartFile photo) {
+        String photoPath = isPhotoNotProvided(photo) ? null : photoStorageService.store(photo);
+        if (photoPath != null) {
+            scheduleDeleteOnRollback(photoPath);
+        }
+        try {
+            CreateLegalContactRequest valid = contactValidator.normalizeAndValidate(request);
+            validateCreatorAndPermissions(createdBy, valid.commercialTypes());
+            ensureIdentityIsNew(valid.documentType(), valid.documentNumber());
+
+            Contact contact = new Contact(PersonType.JURIDICA, valid.legalName(), valid.documentType(),
+                    valid.documentNumber(), valid.address(), LocalDateTime.now(), createdBy);
+            contact.setPhotoPath(photoPath);
+            addChildrenAndCommercialTypes(contact, valid.phones(), valid.emails(), valid.commercialTypes());
+            return save(contact);
+        } catch (RuntimeException exception) {
+            if (photoPath != null) {
+                deleteImmediately(photoPath);
+            }
+            throw exception;
+        }
     }
 
     @Transactional
@@ -176,6 +216,53 @@ public class ContactService {
         return saveModified(contact, actor);
     }
 
+    @Transactional
+    public Contact replacePhoto(Long contactId, MultipartFile photo, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        String newPath = photoStorageService.store(photo);
+        scheduleDeleteOnRollback(newPath);
+        String oldPath = contact.getPhotoPath();
+        User oldUpdatedBy = contact.getUpdatedBy();
+        LocalDateTime oldUpdatedAt = contact.getUpdatedAt();
+        contact.setPhotoPath(newPath);
+        try {
+            Contact updated = saveModified(contact, actor);
+            scheduleDeleteAfterCommit(oldPath);
+            return updated;
+        } catch (RuntimeException exception) {
+            contact.setPhotoPath(oldPath);
+            contact.setUpdatedBy(oldUpdatedBy);
+            contact.setUpdatedAt(oldUpdatedAt);
+            deleteImmediately(newPath);
+            throw exception;
+        }
+    }
+
+    @Transactional
+    public Contact removePhoto(Long contactId, User actor) {
+        Contact contact = loadEditableContact(contactId, actor);
+        String oldPath = contact.getPhotoPath();
+        User oldUpdatedBy = contact.getUpdatedBy();
+        LocalDateTime oldUpdatedAt = contact.getUpdatedAt();
+        contact.setPhotoPath(null);
+        Contact updated;
+        try {
+            updated = saveModified(contact, actor);
+        } catch (RuntimeException exception) {
+            contact.setPhotoPath(oldPath);
+            contact.setUpdatedBy(oldUpdatedBy);
+            contact.setUpdatedAt(oldUpdatedAt);
+            throw exception;
+        }
+        scheduleDeleteAfterCommit(oldPath);
+        return updated;
+    }
+
+    @Transactional(readOnly = true)
+    public String getPhotoPathForViewing(Long contactId, User actor) {
+        return loadEditableContact(contactId, actor).getPhotoPath();
+    }
+
     @Transactional(readOnly = true)
     public Optional<Contact> findById(Long id) {
         return contactRepository.findById(id);
@@ -254,6 +341,46 @@ public class ContactService {
         } catch (DataIntegrityViolationException exception) {
             throw new ContactBusinessException(
                     "No se pudo guardar la modificación porque algunos datos ya están registrados.");
+        }
+    }
+
+    private boolean isPhotoNotProvided(MultipartFile photo) {
+        return photo == null || (photo.isEmpty()
+                && (photo.getOriginalFilename() == null || photo.getOriginalFilename().isBlank()));
+    }
+
+    private void scheduleDeleteAfterCommit(String photoPath) {
+        if (photoPath == null) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    photoStorageService.delete(photoPath);
+                }
+            });
+        } else {
+            photoStorageService.delete(photoPath);
+        }
+    }
+
+    private void scheduleDeleteOnRollback(String photoPath) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) {
+                        photoStorageService.delete(photoPath);
+                    }
+                }
+            });
+        }
+    }
+
+    private void deleteImmediately(String photoPath) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            photoStorageService.delete(photoPath);
         }
     }
 

@@ -45,6 +45,23 @@
         </form>
     </section>
 
+    <section aria-labelledby="photo-title">
+        <h2 id="photo-title">Fotografía</h2>
+        <figure th:if="${photoUrl}">
+            <img th:src="${photoUrl}" alt="Fotografía del contacto">
+        </figure>
+        <p th:unless="${photoUrl}">Este contacto no tiene fotografía.</p>
+        <form th:action="@{/contactos/{id}/foto(id=${contact.id})}" method="post" enctype="multipart/form-data">
+            <label>Agregar o reemplazar fotografía
+                <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
+            </label>
+            <button type="submit">Guardar fotografía</button>
+        </form>
+        <form th:if="${photoUrl}" th:action="@{/contactos/{id}/foto/eliminar(id=${contact.id})}" method="post">
+            <button type="submit">Eliminar fotografía</button>
+        </form>
+    </section>
+
     <section aria-labelledby="phones-title">
         <h2 id="phones-title">Teléfonos</h2>
         <div th:each="phone : ${contact.phones}">

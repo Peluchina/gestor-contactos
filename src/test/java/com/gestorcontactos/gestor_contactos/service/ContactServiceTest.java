@@ -453,6 +453,106 @@ class ContactServiceTest {
     }
 
     @Test
+    void administratorSoftDeletesInPlaceAndPreservesContactData() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        contact.addCommercialType(CommercialType.PROVEEDOR);
+        contact.addPhone(new com.gestorcontactos.gestor_contactos.entity.ContactPhone(
+                PhoneType.CELULAR, "", "987654321"));
+        contact.addEmail(new com.gestorcontactos.gestor_contactos.entity.ContactEmail("contact@example.com"));
+        contact.setPhotoPath("uploads/contacts/contact.jpg");
+        prepareContactForUpdate(107L, contact);
+        LocalDateTime before = LocalDateTime.now(java.time.ZoneId.of("America/Lima"));
+
+        Contact deleted = contactService.softDelete(107L, administrator);
+
+        assertEquals(contact, deleted);
+        assertNotNull(deleted.getDeletedAt());
+        assertFalse(deleted.getDeletedAt().isBefore(before));
+        assertFalse(deleted.getDeletedAt().isAfter(LocalDateTime.now(java.time.ZoneId.of("America/Lima"))));
+        assertEquals(administrator, deleted.getDeletedBy());
+        assertEquals(administrator, deleted.getUpdatedBy());
+        assertNotNull(deleted.getUpdatedAt());
+        assertEquals(ContactStatus.ACTIVO, deleted.getStatus());
+        assertEquals("12345678", deleted.getDocumentNumber());
+        assertEquals("Av. Perú 123", deleted.getAddress());
+        assertEquals("987654321", deleted.getPhones().get(0).getPhoneNumber());
+        assertEquals("contact@example.com", deleted.getEmails().get(0).getEmail());
+        assertEquals("uploads/contacts/contact.jpg", deleted.getPhotoPath());
+        assertEquals(Set.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR), deleted.getCommercialTypes());
+        verify(contactRepository).saveAndFlush(contact);
+        verify(contactRepository, never()).delete(any(Contact.class));
+        verify(photoStorageService, never()).delete(any());
+    }
+
+    @Test
+    void administratorRestoresDeletedContactAsInactiveAndPreservesData() {
+        Contact contact = existingContactWithType(CommercialType.PROVEEDOR);
+        contact.addPhone(new com.gestorcontactos.gestor_contactos.entity.ContactPhone(
+                PhoneType.CELULAR, "", "987654321"));
+        contact.addEmail(new com.gestorcontactos.gestor_contactos.entity.ContactEmail("contact@example.com"));
+        contact.setPhotoPath("uploads/contacts/contact.jpg");
+        contact.setDeletedAt(LocalDateTime.now().minusDays(2));
+        contact.setDeletedBy(user(Role.ADMINISTRADOR));
+        contact.setStatus(ContactStatus.ACTIVO);
+        prepareContactForUpdate(108L, contact);
+
+        Contact restored = contactService.restore(108L, administrator);
+
+        assertEquals(contact, restored);
+        assertEquals(null, restored.getDeletedAt());
+        assertEquals(null, restored.getDeletedBy());
+        assertEquals(ContactStatus.INACTIVO, restored.getStatus());
+        assertEquals(administrator, restored.getUpdatedBy());
+        assertNotNull(restored.getUpdatedAt());
+        assertEquals("12345678", restored.getDocumentNumber());
+        assertEquals("987654321", restored.getPhones().get(0).getPhoneNumber());
+        assertEquals("contact@example.com", restored.getEmails().get(0).getEmail());
+        assertEquals("uploads/contacts/contact.jpg", restored.getPhotoPath());
+        assertEquals(Set.of(CommercialType.PROVEEDOR), restored.getCommercialTypes());
+        verify(contactRepository).saveAndFlush(contact);
+        verify(contactRepository, never()).delete(any(Contact.class));
+        verify(photoStorageService, never()).delete(any());
+    }
+
+    @Test
+    void onlyEnabledAdministratorCanSoftDeleteOrRestore() {
+        Contact contact = existingContact();
+        Contact deleted = existingContact();
+        deleted.setDeletedAt(LocalDateTime.now());
+        when(contactRepository.findById(109L)).thenReturn(Optional.of(contact));
+        when(contactRepository.findById(113L)).thenReturn(Optional.of(deleted));
+        for (Role role : List.of(Role.VENDEDOR, Role.COMPRAS, Role.ALMACENERO)) {
+            assertThrows(AccessDeniedException.class, () -> contactService.softDelete(109L, user(role)));
+            assertThrows(AccessDeniedException.class, () -> contactService.restore(113L, user(role)));
+        }
+        User disabledAdmin = new User("disabled", "hash", Role.ADMINISTRADOR, false, LocalDateTime.now());
+        assertThrows(AccessDeniedException.class, () -> contactService.softDelete(109L, disabledAdmin));
+        assertThrows(AccessDeniedException.class, () -> contactService.restore(113L, disabledAdmin));
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
+    }
+
+    @Test
+    void rejectsMissingAlreadyDeletedAndNotDeletedLifecycleOperations() {
+        Contact deleted = existingContact();
+        deleted.setDeletedAt(LocalDateTime.now());
+        when(contactRepository.findById(110L)).thenReturn(Optional.empty());
+        when(contactRepository.findById(111L)).thenReturn(Optional.of(deleted));
+        when(contactRepository.findById(112L)).thenReturn(Optional.of(existingContact()));
+
+        assertThrows(ContactBusinessException.class, () -> contactService.softDelete(110L, administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.softDelete(111L, administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.restore(112L, administrator));
+        assertThrows(ContactBusinessException.class, () -> contactService.restore(110L, administrator));
+        verify(contactRepository, never()).saveAndFlush(any(Contact.class));
+    }
+
+    @Test
+    void delegatesDeletedContactListToRepository() {
+        contactService.findAllDeleted();
+        verify(contactRepository).findAllByDeletedAtIsNotNullOrderByDeletedAtDesc();
+    }
+
+    @Test
     void administratorSellerAndPurchasingCanUpdateAddressWithinTheirContactScope() {
         Contact adminContact = existingContactWithType(CommercialType.PROVEEDOR);
         Contact sellerContact = existingContactWithType(CommercialType.CLIENTE);

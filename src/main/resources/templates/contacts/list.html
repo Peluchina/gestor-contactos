@@ -14,6 +14,7 @@
         <a th:if="${canCreateNatural}" th:href="@{/contactos/nuevo/natural}">Crear persona natural</a>
         <a th:if="${canCreateLegal}" th:href="@{/contactos/nuevo/juridica}">Crear persona jurídica</a>
         <a th:if="${canSearch}" th:href="@{/contactos/buscar}">Buscar por documento</a>
+        <a th:if="${canViewDeletedContacts}" th:href="@{/contactos/eliminados}">Contactos eliminados</a>
         <a th:href="@{/dashboard}">Inicio</a>
     </nav>
     <table>

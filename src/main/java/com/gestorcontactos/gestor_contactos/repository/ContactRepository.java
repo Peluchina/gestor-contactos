@@ -14,6 +14,8 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
 
     List<Contact> findAllByDeletedAtIsNull();
 
+    List<Contact> findAllByDeletedAtIsNotNullOrderByDeletedAtDesc();
+
     List<Contact> findAllByStatusAndDeletedAtIsNull(ContactStatus status);
 
     Optional<Contact> findByDocumentTypeAndDocumentNumber(DocumentType documentType, String documentNumber);

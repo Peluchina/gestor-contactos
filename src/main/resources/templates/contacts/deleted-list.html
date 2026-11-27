@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contactos eliminados | Gestor de Contactos</title>
+</head>
+<body>
+<main>
+    <h1>Contactos eliminados</h1>
+    <p th:if="${success}" th:text="${success}" role="status"></p>
+    <p th:if="${error}" th:text="${error}" role="alert"></p>
+    <a th:href="@{/contactos}">Volver a contactos</a>
+    <table>
+        <thead>
+        <tr><th>Tipo</th><th>Nombre</th><th>Documento</th><th>Eliminación</th><th>Estado previo</th><th>Detalle</th><th>Acción</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="contact : ${contacts}">
+            <td th:text="${contact.personType}"></td>
+            <td th:text="${contact.displayName}"></td>
+            <td th:text="${contact.documentType + ' ' + contact.documentNumber}"></td>
+            <td><strong>ELIMINADO (lógico)</strong></td>
+            <td th:text="${contact.status}"></td>
+            <td><a th:href="@{/contactos/{id}(id=${contact.id})}">Consultar eliminado</a></td>
+            <td>
+                <form th:action="@{/contactos/{id}/recuperar(id=${contact.id})}" method="post">
+                    <button type="submit">Recuperar como INACTIVO</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(contacts)}"><td colspan="7">No hay contactos eliminados.</td></tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

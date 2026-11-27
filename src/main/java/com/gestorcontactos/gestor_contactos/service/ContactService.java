@@ -14,6 +14,7 @@ import com.gestorcontactos.gestor_contactos.entity.ContactPhone;
 import com.gestorcontactos.gestor_contactos.entity.ContactStatus;
 import com.gestorcontactos.gestor_contactos.entity.DocumentType;
 import com.gestorcontactos.gestor_contactos.entity.PersonType;
+import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
 import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
@@ -155,6 +156,43 @@ public class ContactService {
 
         contact.setStatus(newStatus);
         return saveModified(contact, actor);
+    }
+
+    @Transactional
+    public Contact softDelete(Long contactId, User actor) {
+        Contact contact = contactRepository.findById(contactId)
+                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+        if (contact.getDeletedAt() != null) {
+            throw new ContactBusinessException("El contacto ya está eliminado.");
+        }
+        requireAdministrator(actor);
+
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Lima"));
+        contact.setDeletedAt(now);
+        contact.setDeletedBy(actor);
+        return saveModified(contact, actor, now);
+    }
+
+    @Transactional
+    public Contact restore(Long contactId, User actor) {
+        Contact contact = contactRepository.findById(contactId)
+                .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+        if (contact.getDeletedAt() == null) {
+            throw new ContactBusinessException("El contacto no está eliminado.");
+        }
+        requireAdministrator(actor);
+
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Lima"));
+        contact.setDeletedAt(null);
+        contact.setDeletedBy(null);
+        contact.setStatus(ContactStatus.INACTIVO);
+        return saveModified(contact, actor, now);
+    }
+
+    private void requireAdministrator(User actor) {
+        if (actor == null || actor.getRole() != Role.ADMINISTRADOR || !actor.isEnabled()) {
+            throw new AccessDeniedException("Solo un administrador habilitado puede realizar esta operación.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -309,6 +347,11 @@ public class ContactService {
     }
 
     @Transactional(readOnly = true)
+    public List<Contact> findAllDeleted() {
+        return contactRepository.findAllByDeletedAtIsNotNullOrderByDeletedAtDesc();
+    }
+
+    @Transactional(readOnly = true)
     public List<Contact> findAllNotDeletedByCommercialType(CommercialType commercialType) {
         return contactRepository.findAllNotDeletedByCommercialType(commercialType);
     }
@@ -364,8 +407,12 @@ public class ContactService {
     }
 
     private Contact saveModified(Contact contact, User actor) {
+        return saveModified(contact, actor, LocalDateTime.now(ZoneId.of("America/Lima")));
+    }
+
+    private Contact saveModified(Contact contact, User actor, LocalDateTime updatedAt) {
         contact.setUpdatedBy(actor);
-        contact.setUpdatedAt(LocalDateTime.now(ZoneId.of("America/Lima")));
+        contact.setUpdatedAt(updatedAt);
         try {
             return contactRepository.saveAndFlush(contact);
         } catch (DataIntegrityViolationException exception) {

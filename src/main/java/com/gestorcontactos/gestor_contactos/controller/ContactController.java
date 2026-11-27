@@ -82,7 +82,15 @@ public class ContactController {
         model.addAttribute("canSearch", actor.getRole() != Role.ALMACENERO);
         model.addAttribute("canCreateNatural", actor.getRole() == Role.ADMINISTRADOR || actor.getRole() == Role.VENDEDOR);
         model.addAttribute("canCreateLegal", actor.getRole() == Role.ADMINISTRADOR || actor.getRole() == Role.COMPRAS);
+        model.addAttribute("canViewDeletedContacts", actor.getRole() == Role.ADMINISTRADOR);
         return "contacts/list";
+    }
+
+    @GetMapping("/contactos/eliminados")
+    public String listDeletedContacts(@AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
+        authenticatedUser(currentUser);
+        model.addAttribute("contacts", contactService.findAllDeleted().stream().map(this::toListItem).toList());
+        return "contacts/deleted-list";
     }
 
     @GetMapping("/contactos/nuevo/natural")
@@ -182,8 +190,11 @@ public class ContactController {
             @AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
         User actor = authenticatedUser(currentUser);
         Contact contact = contactService.findById(id)
-                .filter(found -> found.getDeletedAt() == null)
                 .orElseThrow(() -> new ContactBusinessException("No se encontró el contacto indicado."));
+        boolean deleted = contact.getDeletedAt() != null;
+        if (deleted && actor.getRole() != Role.ADMINISTRADOR) {
+            throw new AccessDeniedException("No tiene permiso para consultar este contacto.");
+        }
         requireReadPermission(actor.getRole(), contact);
         if (actor.getRole() == Role.ALMACENERO) {
             model.addAttribute("contact", toWarehouseDetails(contact));
@@ -191,10 +202,20 @@ public class ContactController {
         } else {
             model.addAttribute("contact", toDetailsView(contact));
             model.addAttribute("restrictedView", false);
-            model.addAttribute("canEdit", true);
-            model.addAttribute("canChangeStatus", actor.getRole() == Role.ADMINISTRADOR);
-            model.addAttribute("photoUrl", contact.getPhotoPath() == null ? null : "/contactos/" + id + "/foto");
-            addRelationActions(model, actor.getRole(), contact);
+            model.addAttribute("deletedContact", deleted);
+            model.addAttribute("canEdit", !deleted);
+            model.addAttribute("canChangeStatus", !deleted && actor.getRole() == Role.ADMINISTRADOR);
+            model.addAttribute("canDelete", !deleted && actor.getRole() == Role.ADMINISTRADOR);
+            model.addAttribute("canRecover", deleted && actor.getRole() == Role.ADMINISTRADOR);
+            model.addAttribute("photoUrl", !deleted && contact.getPhotoPath() != null
+                    ? "/contactos/" + id + "/foto" : null);
+            model.addAttribute("showPhotoMissing", !deleted && contact.getPhotoPath() == null);
+            if (!deleted) {
+                addRelationActions(model, actor.getRole(), contact);
+            } else {
+                model.addAttribute("canAddClient", false);
+                model.addAttribute("canAddSupplier", false);
+            }
         }
         return "contacts/detail";
     }
@@ -314,6 +335,30 @@ public class ContactController {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
         return "redirect:/contactos/" + id;
+    }
+
+    @PostMapping("/contactos/{id}/eliminar")
+    public String deleteContact(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        try {
+            contactService.softDelete(id, authenticatedUser(currentUser));
+            redirectAttributes.addFlashAttribute("success", "Contacto eliminado correctamente.");
+        } catch (ContactBusinessException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/contactos";
+    }
+
+    @PostMapping("/contactos/{id}/recuperar")
+    public String restoreContact(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser, RedirectAttributes redirectAttributes) {
+        try {
+            contactService.restore(id, authenticatedUser(currentUser));
+            redirectAttributes.addFlashAttribute("success", "Contacto recuperado correctamente como INACTIVO.");
+        } catch (ContactBusinessException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/contactos/eliminados";
     }
 
     @PostMapping("/contactos/{id}/relaciones/cliente")

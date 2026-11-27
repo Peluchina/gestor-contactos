@@ -462,6 +462,89 @@ class ContactControllerSecurityTest {
         verify(contactService, never()).findAllNotDeletedByCommercialType(CommercialType.PROVEEDOR);
     }
 
+    @Test
+    void administratorCanDeleteAndRestoreWithCsrfAndAuthenticatedActor() throws Exception {
+        User admin = actor("admin-delete", Role.ADMINISTRADOR);
+
+        mockMvc.perform(post("/contactos/81/eliminar").with(user(new CustomUserDetails(admin))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos"));
+        mockMvc.perform(post("/contactos/81/recuperar").with(user(new CustomUserDetails(admin))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos/eliminados"));
+
+        verify(contactService).softDelete(81L, admin);
+        verify(contactService).restore(81L, admin);
+    }
+
+    @Test
+    void deleteAndRestoreRequireCsrfToken() throws Exception {
+        User admin = actor("admin-csrf", Role.ADMINISTRADOR);
+
+        mockMvc.perform(post("/contactos/82/eliminar").with(user(new CustomUserDetails(admin))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/contactos/82/recuperar").with(user(new CustomUserDetails(admin))))
+                .andExpect(status().isForbidden());
+
+        verify(contactService, never()).softDelete(eq(82L), any(User.class));
+        verify(contactService, never()).restore(eq(82L), any(User.class));
+    }
+
+    @Test
+    void onlyAdministratorCanDeleteRestoreAndViewDeletedContacts() throws Exception {
+        for (Role role : List.of(Role.VENDEDOR, Role.COMPRAS, Role.ALMACENERO)) {
+            User actor = actor("role-" + role, role);
+            mockMvc.perform(post("/contactos/83/eliminar").with(user(new CustomUserDetails(actor))).with(csrf()))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(post("/contactos/83/recuperar").with(user(new CustomUserDetails(actor))).with(csrf()))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(get("/contactos/eliminados").with(user(new CustomUserDetails(actor))))
+                    .andExpect(status().isForbidden());
+        }
+        verify(contactService, never()).softDelete(eq(83L), any(User.class));
+        verify(contactService, never()).restore(eq(83L), any(User.class));
+        verify(contactService, never()).findAllDeleted();
+    }
+
+    @Test
+    void administratorCanSeeDeletedListAndRestoreForm() throws Exception {
+        User admin = actor("admin-deleted-list", Role.ADMINISTRADOR);
+        Contact deleted = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), admin);
+        setEntityId(deleted, 85L);
+        deleted.setDeletedAt(LocalDateTime.now());
+        when(contactService.findAllDeleted()).thenReturn(List.of(deleted));
+
+        mockMvc.perform(get("/contactos/eliminados").with(user(new CustomUserDetails(admin))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contacts/deleted-list"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("María Pérez")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("ELIMINADO (lógico)")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")));
+    }
+
+    @Test
+    void administratorCanViewDeletedContactAndOnlyRestoreActionIsAvailable() throws Exception {
+        User admin = actor("admin-deleted-detail", Role.ADMINISTRADOR);
+        Contact deleted = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), admin);
+        setEntityId(deleted, 84L);
+        deleted.setDeletedAt(LocalDateTime.now());
+        deleted.setDeletedBy(admin);
+        when(contactService.findById(84L)).thenReturn(Optional.of(deleted));
+
+        mockMvc.perform(get("/contactos/84").with(user(new CustomUserDetails(admin))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contacts/detail"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Contacto eliminado lógicamente.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/contactos/84/recuperar")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("/contactos/84/eliminar"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("/contactos/84/editar"))));
+    }
+
     private void mockNaturalCreation(User actor, Set<CommercialType> commercialTypes) {
         when(userService.findByUsername(actor.getUsername())).thenReturn(Optional.of(actor));
         Contact created = org.mockito.Mockito.mock(Contact.class);
@@ -490,6 +573,16 @@ class ContactControllerSecurityTest {
         User actor = new User(username, "hash", role, true, LocalDateTime.now());
         when(userService.findByUsername(username)).thenReturn(Optional.of(actor));
         return actor;
+    }
+
+    private void setEntityId(Contact entity, Long id) {
+        try {
+            var field = Contact.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(entity, id);
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError("Unable to prepare persisted contact fixture", exception);
+        }
     }
 
     private org.springframework.util.MultiValueMap<String, String> validNaturalParameters() {

@@ -1,0 +1,22 @@
+.document-number-input.is-invalid {
+    border: 2px solid #b42318;
+}
+
+.document-number-input.is-valid {
+    border: 2px solid #067647;
+}
+
+.document-feedback {
+    min-height: 1.5em;
+    margin-top: 0.25rem;
+}
+
+.document-feedback.is-invalid {
+    color: #b42318;
+    font-weight: 600;
+}
+
+.document-feedback.is-valid {
+    color: #067647;
+    font-weight: 600;
+}

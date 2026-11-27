@@ -12,8 +12,8 @@
 <main>
     <h1>Crear persona natural</h1>
     <p class="page-intro">Completa los datos de identidad, ubicación y contacto. Los campos marcados con * son obligatorios.</p>
-    <form th:action="@{/contactos/natural}" th:object="${form}" method="post" enctype="multipart/form-data"
-          data-document-validation>
+        <form th:action="@{/contactos/natural}" th:object="${form}" method="post" enctype="multipart/form-data"
+          data-document-validation data-phone-form>
         <div th:if="${#fields.hasGlobalErrors()}" class="alert alert--error" role="alert">
             <p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
         </div>
@@ -48,21 +48,33 @@
         <fieldset class="form-section">
             <legend>Teléfonos</legend>
             <div id="phone-rows" data-collection="phones">
-                <fieldset th:each="phone, item : ${form.phones}" data-row>
+                <fieldset th:each="phone, item : ${form.phones}" data-row data-phone-row>
                     <legend th:text="${'Teléfono ' + (item.index + 1)}"></legend>
                     <label th:for="${'phone-type-' + item.index}">Tipo</label>
-                    <select th:id="${'phone-type-' + item.index}"
+                    <select th:id="${'phone-type-' + item.index}" data-phone-type
                             th:name="${'phones[' + item.index + '].phoneType'}" required>
                         <option value="CELULAR" th:selected="${phone.phoneType == T(com.gestorcontactos.gestor_contactos.entity.PhoneType).CELULAR}">Celular</option>
                         <option value="FIJO" th:selected="${phone.phoneType == T(com.gestorcontactos.gestor_contactos.entity.PhoneType).FIJO}">Fijo</option>
                     </select>
-                    <label th:for="${'phone-area-' + item.index}">Código de área</label>
-                    <input type="text" th:id="${'phone-area-' + item.index}"
-                           th:name="${'phones[' + item.index + '].areaCode'}" th:value="${phone.areaCode}">
-                    <label th:for="${'phone-number-' + item.index}">Número</label>
+                    <div class="phone-area-field" data-phone-area-field>
+                        <label th:for="${'phone-area-' + item.index}">Código de área</label>
+                        <input class="phone-input" type="text" th:id="${'phone-area-' + item.index}"
+                               data-phone-area inputmode="numeric" maxlength="5" pattern="[0-9]{1,5}"
+                               th:name="${'phones[' + item.index + '].areaCode'}" th:value="${phone.areaCode}"
+                               th:attr="aria-describedby=${'phone-area-help-' + item.index + ' phone-area-feedback-' + item.index}">
+                        <p class="phone-field-help" th:id="${'phone-area-help-' + item.index}">Para teléfono fijo, ingresa el código de área usando solo dígitos.</p>
+                        <p class="phone-field-feedback" th:id="${'phone-area-feedback-' + item.index}"
+                           data-phone-area-feedback aria-live="polite" role="status"></p>
+                    </div>
+                    <label th:for="${'phone-number-' + item.index}"><span data-phone-number-label>Número de celular</span></label>
                     <input type="text" th:id="${'phone-number-' + item.index}"
+                           class="phone-input" data-phone-number inputmode="numeric" maxlength="9" pattern="[0-9]{9}"
                            th:name="${'phones[' + item.index + '].phoneNumber'}"
-                           th:value="${phone.phoneNumber}" required>
+                           th:value="${phone.phoneNumber}" required
+                           th:attr="aria-describedby=${'phone-number-help-' + item.index + ' phone-number-feedback-' + item.index}">
+                    <p class="phone-field-help" th:id="${'phone-number-help-' + item.index}" data-phone-number-help>Ingresa 9 dígitos. Ejemplo: 987654321</p>
+                    <p class="phone-field-feedback" th:id="${'phone-number-feedback-' + item.index}"
+                       data-phone-number-feedback aria-live="polite" role="status"></p>
                     <button type="button" data-remove-row>Quitar teléfono</button>
                 </fieldset>
             </div>

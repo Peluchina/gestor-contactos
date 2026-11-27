@@ -69,15 +69,31 @@
         <h2 id="phones-title">Teléfonos</h2>
         <div class="detail-section" th:each="phone : ${contact.phones}">
             <form th:action="@{/contactos/{id}/telefonos/{phoneId}/editar(id=${contact.id},phoneId=${phone.id})}"
-                  method="post">
+                  method="post" data-phone-form data-phone-row>
                 <label>Tipo
-                    <select name="phoneType" required>
+                    <select name="phoneType" data-phone-type required>
                         <option value="CELULAR" th:selected="${phone.phoneType.name() == 'CELULAR'}">Celular</option>
                         <option value="FIJO" th:selected="${phone.phoneType.name() == 'FIJO'}">Fijo</option>
                     </select>
                 </label>
-                <label>Código de área <input type="text" name="areaCode" th:value="${phone.areaCode}"></label>
-                <label>Número <input type="text" name="phoneNumber" th:value="${phone.phoneNumber}" required></label>
+                <div class="phone-area-field" data-phone-area-field>
+                    <label th:for="${'phone-area-' + phone.id}">Código de área</label>
+                    <input class="phone-input" type="text" th:id="${'phone-area-' + phone.id}"
+                           name="areaCode" data-phone-area inputmode="numeric" maxlength="5" pattern="[0-9]{1,5}"
+                           th:value="${phone.areaCode}"
+                           th:attr="aria-describedby=${'phone-area-help-' + phone.id + ' phone-area-feedback-' + phone.id}">
+                    <p class="phone-field-help" th:id="${'phone-area-help-' + phone.id}">Para teléfono fijo, ingresa el código de área usando solo dígitos.</p>
+                    <p class="phone-field-feedback" th:id="${'phone-area-feedback-' + phone.id}"
+                       data-phone-area-feedback aria-live="polite" role="status"></p>
+                </div>
+                <label th:for="${'phone-number-' + phone.id}"><span data-phone-number-label>Número de celular</span></label>
+                <input class="phone-input" type="text" th:id="${'phone-number-' + phone.id}"
+                       name="phoneNumber" data-phone-number inputmode="numeric" maxlength="9" pattern="[0-9]{9}"
+                       th:value="${phone.phoneNumber}" required
+                       th:attr="aria-describedby=${'phone-number-help-' + phone.id + ' phone-number-feedback-' + phone.id}">
+                <p class="phone-field-help" th:id="${'phone-number-help-' + phone.id}" data-phone-number-help>Ingresa 9 dígitos. Ejemplo: 987654321</p>
+                <p class="phone-field-feedback" th:id="${'phone-number-feedback-' + phone.id}"
+                   data-phone-number-feedback aria-live="polite" role="status"></p>
                 <button type="submit">Guardar teléfono</button>
             </form>
             <form th:action="@{/contactos/{id}/telefonos/{phoneId}/eliminar(id=${contact.id},phoneId=${phone.id})}"
@@ -86,16 +102,30 @@
             </form>
         </div>
         <form class="form-section" th:action="@{/contactos/{id}/telefonos(id=${contact.id})}"
-              th:object="${phoneForm}" method="post">
+              th:object="${phoneForm}" method="post" data-phone-form data-phone-row>
             <h3>Agregar teléfono</h3>
             <label>Tipo
-                <select th:field="*{phoneType}" required>
+                <select th:field="*{phoneType}" data-phone-type required>
                     <option value="CELULAR">Celular</option>
                     <option value="FIJO">Fijo</option>
                 </select>
             </label>
-            <label>Código de área <input type="text" th:field="*{areaCode}"></label>
-            <label>Número <input type="text" th:field="*{phoneNumber}" required></label>
+            <div class="phone-area-field" data-phone-area-field>
+                <label for="phone-area-new">Código de área</label>
+                <input class="phone-input" id="phone-area-new" type="text" th:field="*{areaCode}"
+                       data-phone-area inputmode="numeric" maxlength="5" pattern="[0-9]{1,5}"
+                       aria-describedby="phone-area-help-new phone-area-feedback-new">
+                <p class="phone-field-help" id="phone-area-help-new">Para teléfono fijo, ingresa el código de área usando solo dígitos.</p>
+                <p class="phone-field-feedback" id="phone-area-feedback-new" data-phone-area-feedback
+                   aria-live="polite" role="status"></p>
+            </div>
+            <label for="phone-number-new"><span data-phone-number-label>Número de celular</span></label>
+            <input class="phone-input" id="phone-number-new" type="text" th:field="*{phoneNumber}"
+                   data-phone-number inputmode="numeric" maxlength="9" pattern="[0-9]{9}" required
+                   aria-describedby="phone-number-help-new phone-number-feedback-new">
+            <p class="phone-field-help" id="phone-number-help-new" data-phone-number-help>Ingresa 9 dígitos. Ejemplo: 987654321</p>
+            <p class="phone-field-feedback" id="phone-number-feedback-new" data-phone-number-feedback
+               aria-live="polite" role="status"></p>
             <button type="submit">+ Agregar teléfono</button>
         </form>
     </section>
@@ -121,5 +151,6 @@
         </form>
     </section>
 </main>
+<script th:src="@{/js/contact-collections.js}" defer></script>
 </body>
 </html>

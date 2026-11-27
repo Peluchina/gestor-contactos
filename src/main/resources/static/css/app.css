@@ -346,6 +346,39 @@ input[type="file"] {
     padding: 0.4rem;
 }
 
+.phone-area-field[hidden] {
+    display: none;
+}
+
+.phone-field-help {
+    margin: 0.2rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    font-weight: 400;
+}
+
+.phone-field-feedback {
+    min-height: 1.5em;
+    margin: 0.15rem 0 0;
+    font-weight: 650;
+}
+
+.phone-field-feedback.is-invalid {
+    color: var(--color-danger);
+}
+
+.phone-field-feedback.is-valid {
+    color: var(--color-success);
+}
+
+.phone-input.is-invalid {
+    border: 2px solid var(--color-danger);
+}
+
+.phone-input.is-valid {
+    border: 2px solid var(--color-success);
+}
+
 input[type="checkbox"],
 input[type="radio"] {
     width: auto;

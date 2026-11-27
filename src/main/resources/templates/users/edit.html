@@ -4,20 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Editar rol | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
 <main>
-    <p><a th:href="@{/usuarios}">Volver a usuarios</a></p>
+    <a class="button button--secondary" th:href="@{/usuarios}">Cancelar y volver a usuarios</a>
     <h1>Editar rol</h1>
     <p>Usuario: <strong th:text="${user.username}"></strong></p>
-    <form th:action="@{/usuarios/{id}/editar(id=${user.id})}" th:object="${form}" method="post">
+    <form class="form-section" th:action="@{/usuarios/{id}/editar(id=${user.id})}" th:object="${form}" method="post">
         <p th:if="${#fields.hasGlobalErrors()}" th:each="error : ${#fields.globalErrors()}" th:text="${error}" role="alert"></p>
         <label for="role">Rol</label>
         <select id="role" th:field="*{role}" required>
             <option th:each="role : ${roles}" th:value="${role}" th:text="${role}"></option>
         </select>
         <p th:if="${#fields.hasErrors('role')}" th:errors="*{role}" role="alert"></p>
-        <button type="submit">Guardar rol</button>
+        <div class="action-row"><button type="submit">Guardar rol</button>
+            <a class="button button--secondary" th:href="@{/usuarios}">Cancelar</a></div>
     </form>
 </main>
 </body>

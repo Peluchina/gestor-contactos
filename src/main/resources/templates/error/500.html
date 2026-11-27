@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Error interno | Gestor de Contactos</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main>
+    <section class="login-card" aria-labelledby="error-title">
+        <p class="badge badge--inactive">500 · Error interno</p>
+        <h1 id="error-title">Ocurrió un problema</h1>
+        <p>No pudimos completar la solicitud. Inténtalo nuevamente más tarde.</p>
+        <a class="button" th:href="@{/dashboard}">Volver al inicio</a>
+    </section>
+</main>
+</body>
+</html>

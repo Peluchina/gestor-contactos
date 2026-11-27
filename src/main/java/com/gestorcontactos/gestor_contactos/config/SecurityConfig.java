@@ -3,6 +3,7 @@ package com.gestorcontactos.gestor_contactos.config;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetailsService;
 import java.time.Clock;
 import java.time.ZoneId;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -25,6 +26,43 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
                         .requestMatchers("/admin/**", "/usuarios/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/contactos/nuevo/natural")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST, "/contactos/natural")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.GET, "/contactos/nuevo/juridica")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST, "/contactos/juridica")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.GET, "/contactos/buscar")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.GET, "/contactos/eliminados")
+                                .hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/contactos/*/editar")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.GET, "/contactos/*/foto")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST, "/contactos/*/estado")
+                                .hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/contactos/*/eliminar", "/contactos/*/recuperar")
+                                .hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/cliente")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR")
+                        .requestMatchers(HttpMethod.POST, "/contactos/*/relaciones/proveedor")
+                                .hasAnyRole("ADMINISTRADOR", "COMPRAS")
+                        .requestMatchers(HttpMethod.POST,
+                                "/contactos/*/editar",
+                                "/contactos/*/foto",
+                                "/contactos/*/foto/eliminar",
+                                "/contactos/*/telefonos",
+                                "/contactos/*/telefonos/*/editar",
+                                "/contactos/*/telefonos/*/eliminar",
+                                "/contactos/*/correos",
+                                "/contactos/*/correos/*/editar",
+                                "/contactos/*/correos/*/eliminar")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS")
+                        .requestMatchers("/contactos/**")
+                                .hasAnyRole("ADMINISTRADOR", "VENDEDOR", "COMPRAS", "ALMACENERO")
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")

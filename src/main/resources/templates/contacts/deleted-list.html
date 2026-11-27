@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contactos eliminados | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
+<main>
+    <h1>Contactos eliminados</h1>
+    <p class="page-intro">Los contactos se conservan para auditoría y pueden recuperarse como inactivos.</p>
+    <p th:if="${success}" class="alert alert--success" th:text="${success}" role="status"></p>
+    <p th:if="${error}" class="alert alert--error" th:text="${error}" role="alert"></p>
+    <a class="button button--secondary" th:href="@{/contactos}">Volver a contactos</a>
+    <div class="table-scroll">
+    <table>
+        <thead>
+        <tr><th>Tipo</th><th>Nombre</th><th>Documento</th><th>Eliminación</th><th>Estado previo</th><th>Detalle</th><th>Acción</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="contact : ${contacts}">
+            <td th:text="${contact.personType}"></td>
+            <td th:text="${contact.displayName}"></td>
+            <td th:text="${contact.documentType + ' ' + contact.documentNumber}"></td>
+            <td><span class="badge badge--deleted">ELIMINADO (lógico)</span></td>
+            <td><span class="badge" th:classappend="${contact.status.name() == 'ACTIVO'} ? 'badge--active' : 'badge--inactive'"
+                      th:text="${contact.status}"></span></td>
+            <td><a th:href="@{/contactos/{id}(id=${contact.id})}">Consultar</a></td>
+            <td>
+                <form th:action="@{/contactos/{id}/recuperar(id=${contact.id})}" method="post">
+                    <button type="submit">Recuperar como INACTIVO</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(contacts)}"><td colspan="7">No hay contactos eliminados.</td></tr>
+        </tbody>
+    </table>
+    </div>
+</main>
+</body>
+</html>

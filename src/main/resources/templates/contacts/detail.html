@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Detalle de contacto | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
+<main>
+    <a class="button button--secondary" th:href="@{/contactos}">Volver a contactos</a>
+    <h1 th:text="${contact.displayName}"></h1>
+    <p th:if="${deletedContact}" class="alert alert--warning" role="status">Contacto eliminado lógicamente. Estado del registro: ELIMINADO.</p>
+    <section class="detail-section">
+        <p th:unless="${restrictedView}">Tipo de persona: <span class="badge" th:text="${contact.personType}"></span></p>
+        <p>Dirección: <span th:text="${contact.address}"></span></p>
+    </section>
+    <section th:unless="${restrictedView}">
+        <div class="action-row">
+            <a class="button" th:if="${canEdit}" th:href="@{/contactos/{id}/editar(id=${contact.id})}">Editar datos permitidos</a>
+        </div>
+        <figure th:if="${photoUrl}">
+            <img class="contact-photo" th:src="${photoUrl}" alt="Fotografía del contacto">
+        </figure>
+        <p th:if="${showPhotoMissing}" class="muted">Este contacto no tiene fotografía.</p>
+        <section class="detail-grid">
+            <article class="detail-section">
+                <h2>Identificación y estado</h2>
+                <dl class="detail-list">
+                    <dt>Documento</dt><dd th:text="${contact.documentType + ' ' + contact.documentNumber}"></dd>
+                    <dt>Estado:</dt><dd><span class="badge" th:classappend="${contact.status.name() == 'ACTIVO'} ? 'badge--active' : 'badge--inactive'"
+                                                    th:text="${contact.status}"></span></dd>
+                    <dt>Relaciones comerciales</dt>
+                    <dd><span class="badge" th:each="type : ${contact.commercialTypes}" th:text="${type}"></span></dd>
+                </dl>
+            </article>
+            <article class="detail-section">
+                <h2>Datos de contacto</h2>
+                <h3>Teléfonos</h3>
+                <ul><li th:each="phone : ${contact.phones}"
+                        th:text="${phone.phoneType + ' ' + phone.areaCode + ' ' + phone.phoneNumber}"></li></ul>
+                <h3>Correos electrónicos</h3>
+                <ul><li th:each="email : ${contact.emails}" th:text="${email}"></li></ul>
+            </article>
+        </section>
+        <form th:if="${canChangeStatus}" th:action="@{/contactos/{id}/estado(id=${contact.id})}" method="post">
+            <button class="button button--secondary" th:if="${contact.status.name() == 'ACTIVO'}" type="submit" name="status" value="INACTIVO">
+                Inactivar contacto
+            </button>
+            <button th:if="${contact.status.name() == 'INACTIVO'}" type="submit" name="status" value="ACTIVO">
+                Activar contacto
+            </button>
+        </form>
+        <form th:if="${canDelete}" th:action="@{/contactos/{id}/eliminar(id=${contact.id})}" method="post">
+            <button type="submit">Eliminar contacto</button>
+        </form>
+        <form th:if="${canRecover}" th:action="@{/contactos/{id}/recuperar(id=${contact.id})}" method="post">
+            <button type="submit">Recuperar contacto</button>
+        </form>
+        <section class="detail-section" th:if="${isAdministrator}" aria-labelledby="audit-title">
+            <h2 id="audit-title">Auditoría</h2>
+            <dl class="detail-list">
+                <dt>Creado</dt><dd><time th:text="${#temporals.format(createdAt, 'dd/MM/yyyy HH:mm')}"></time> por <span th:text="${createdBy}"></span></dd>
+                <th:block th:if="${updatedAt}"><dt>Actualizado</dt><dd><time th:text="${#temporals.format(updatedAt, 'dd/MM/yyyy HH:mm')}"></time> por <span th:text="${updatedBy}"></span></dd></th:block>
+                <th:block th:if="${deletedAt}"><dt>Eliminado</dt><dd><time th:text="${#temporals.format(deletedAt, 'dd/MM/yyyy HH:mm')}"></time> por <span th:text="${deletedBy}"></span></dd></th:block>
+            </dl>
+        </section>
+        <form th:if="${canAddClient and !clientAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/cliente(id=${contact.id})}" method="post">
+            <button type="submit">Agregar CLIENTE</button>
+        </form>
+        <form th:if="${canAddSupplier and !supplierAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/proveedor(id=${contact.id})}" method="post">
+            <button type="submit">Agregar PROVEEDOR</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Editar contacto | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
+<main>
+    <a class="button button--secondary" th:href="@{/contactos/{id}(id=${contact.id})}">Cancelar y volver al contacto</a>
+    <h1>Editar contacto</h1>
+    <p class="page-intro">La identidad es inmutable. Solo puedes modificar dirección, teléfonos, correos y fotografía.</p>
+    <p th:if="${success}" class="alert alert--success" th:text="${success}" role="status"></p>
+    <p th:if="${error}" class="alert alert--error" th:text="${error}" role="alert"></p>
+
+    <section class="form-section" aria-labelledby="identity-title">
+        <h2 id="identity-title">Identidad (no editable)</h2>
+        <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
+        <label th:if="${contact.personType.name() == 'NATURAL'}">Nombres
+            <input type="text" th:value="${contact.firstNames}" readonly>
+        </label>
+        <label th:if="${contact.personType.name() == 'NATURAL'}">Apellidos
+            <input type="text" th:value="${contact.lastNames}" readonly>
+        </label>
+        <label th:if="${contact.personType.name() == 'JURIDICA'}">Razón social
+            <input type="text" th:value="${contact.legalName}" readonly>
+        </label>
+        <label>Tipo de documento
+            <input type="text" th:value="${contact.documentType}" readonly>
+        </label>
+        <label>Número de documento
+            <input type="text" th:value="${contact.documentNumber}" readonly>
+        </label>
+    </section>
+
+    <section class="form-section" aria-labelledby="editable-title">
+        <h2 id="editable-title">Datos editables</h2>
+        <p>Estado: <span th:text="${contact.status}"></span></p>
+        <p>Relaciones comerciales: <span th:text="${contact.commercialTypes}"></span></p>
+        <form th:action="@{/contactos/{id}/editar(id=${contact.id})}" th:object="${form}" method="post">
+            <div th:if="${#fields.hasGlobalErrors()}" class="alert alert--error" role="alert">
+                <p th:each="fieldError : ${#fields.globalErrors()}" th:text="${fieldError}"></p>
+            </div>
+            <label>Dirección <input type="text" th:field="*{address}" required></label>
+            <button type="submit">Guardar dirección</button>
+        </form>
+    </section>
+
+    <section class="form-section" aria-labelledby="photo-title">
+        <h2 id="photo-title">Fotografía</h2>
+        <figure th:if="${photoUrl}">
+            <img class="contact-photo" th:src="${photoUrl}" alt="Fotografía del contacto">
+        </figure>
+        <p th:unless="${photoUrl}">Este contacto no tiene fotografía.</p>
+        <form th:action="@{/contactos/{id}/foto(id=${contact.id})}" method="post" enctype="multipart/form-data">
+            <label for="photo-edit">Agregar o reemplazar fotografía</label>
+            <input id="photo-edit" type="file" name="photo" data-photo-input
+                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required
+                   aria-describedby="photo-edit-help photo-edit-feedback">
+            <p class="photo-field-help" id="photo-edit-help">Tamaño máximo: 2 MB.</p>
+            <p class="photo-field-feedback" id="photo-edit-feedback" data-photo-feedback
+               role="alert" aria-live="polite"></p>
+            <button type="submit">Guardar fotografía</button>
+        </form>
+        <form th:if="${photoUrl}" th:action="@{/contactos/{id}/foto/eliminar(id=${contact.id})}" method="post">
+            <button type="submit">Eliminar fotografía</button>
+        </form>
+    </section>
+
+    <section class="form-section" aria-labelledby="phones-title">
+        <h2 id="phones-title">Teléfonos</h2>
+        <div class="detail-section" th:each="phone : ${contact.phones}">
+            <form th:action="@{/contactos/{id}/telefonos/{phoneId}/editar(id=${contact.id},phoneId=${phone.id})}"
+                  method="post" data-phone-form data-phone-row>
+                <label>Tipo
+                    <select name="phoneType" data-phone-type required>
+                        <option value="CELULAR" th:selected="${phone.phoneType.name() == 'CELULAR'}">Celular</option>
+                        <option value="FIJO" th:selected="${phone.phoneType.name() == 'FIJO'}">Fijo</option>
+                    </select>
+                </label>
+                <div class="phone-area-field" data-phone-area-field>
+                    <label th:for="${'phone-area-' + phone.id}">Código de área</label>
+                    <input class="phone-input" type="text" th:id="${'phone-area-' + phone.id}"
+                           name="areaCode" data-phone-area inputmode="numeric" maxlength="3" pattern="[0-9]{2,3}"
+                           th:value="${phone.areaCode}"
+                           th:attr="aria-describedby=${'phone-area-help-' + phone.id + ' phone-area-feedback-' + phone.id}">
+                    <p class="phone-field-help" th:id="${'phone-area-help-' + phone.id}">Para teléfono fijo, ingresa 2 o 3 dígitos.</p>
+                    <p class="phone-field-feedback" th:id="${'phone-area-feedback-' + phone.id}"
+                       data-phone-area-feedback aria-live="polite" role="status"></p>
+                </div>
+                <label th:for="${'phone-number-' + phone.id}"><span data-phone-number-label>Número de celular</span></label>
+                <input class="phone-input" type="text" th:id="${'phone-number-' + phone.id}"
+                       name="phoneNumber" data-phone-number inputmode="numeric" maxlength="9" pattern="[0-9]{9}"
+                       th:value="${phone.phoneNumber}" required
+                       th:attr="aria-describedby=${'phone-number-help-' + phone.id + ' phone-number-feedback-' + phone.id}">
+                <p class="phone-field-help" th:id="${'phone-number-help-' + phone.id}" data-phone-number-help>Ingresa 9 dígitos. Ejemplo: 987654321</p>
+                <p class="phone-field-feedback" th:id="${'phone-number-feedback-' + phone.id}"
+                   data-phone-number-feedback aria-live="polite" role="status"></p>
+                <button type="submit">Guardar teléfono</button>
+            </form>
+            <form th:action="@{/contactos/{id}/telefonos/{phoneId}/eliminar(id=${contact.id},phoneId=${phone.id})}"
+                  method="post">
+                <button type="submit">Eliminar teléfono</button>
+            </form>
+        </div>
+        <form class="form-section" th:action="@{/contactos/{id}/telefonos(id=${contact.id})}"
+              th:object="${phoneForm}" method="post" data-phone-form data-phone-row>
+            <h3>Agregar teléfono</h3>
+            <label>Tipo
+                <select th:field="*{phoneType}" data-phone-type required>
+                    <option value="CELULAR">Celular</option>
+                    <option value="FIJO">Fijo</option>
+                </select>
+            </label>
+            <div class="phone-area-field" data-phone-area-field>
+                <label for="phone-area-new">Código de área</label>
+                <input class="phone-input" id="phone-area-new" type="text" th:field="*{areaCode}"
+                       data-phone-area inputmode="numeric" maxlength="3" pattern="[0-9]{2,3}"
+                       aria-describedby="phone-area-help-new phone-area-feedback-new">
+                <p class="phone-field-help" id="phone-area-help-new">Para teléfono fijo, ingresa 2 o 3 dígitos.</p>
+                <p class="phone-field-feedback" id="phone-area-feedback-new" data-phone-area-feedback
+                   aria-live="polite" role="status"></p>
+            </div>
+            <label for="phone-number-new"><span data-phone-number-label>Número de celular</span></label>
+            <input class="phone-input" id="phone-number-new" type="text" th:field="*{phoneNumber}"
+                   data-phone-number inputmode="numeric" maxlength="9" pattern="[0-9]{9}" required
+                   aria-describedby="phone-number-help-new phone-number-feedback-new">
+            <p class="phone-field-help" id="phone-number-help-new" data-phone-number-help>Ingresa 9 dígitos. Ejemplo: 987654321</p>
+            <p class="phone-field-feedback" id="phone-number-feedback-new" data-phone-number-feedback
+               aria-live="polite" role="status"></p>
+            <button type="submit">+ Agregar teléfono</button>
+        </form>
+    </section>
+
+    <section class="form-section" aria-labelledby="emails-title">
+        <h2 id="emails-title">Correos electrónicos</h2>
+        <div class="detail-section" th:each="email : ${contact.emails}">
+            <form th:action="@{/contactos/{id}/correos/{emailId}/editar(id=${contact.id},emailId=${email.id})}"
+                  method="post">
+                <label>Correo <input type="email" name="email" th:value="${email.email}" required></label>
+                <button type="submit">Guardar correo</button>
+            </form>
+            <form th:action="@{/contactos/{id}/correos/{emailId}/eliminar(id=${contact.id},emailId=${email.id})}"
+                  method="post">
+                <button type="submit">Eliminar correo</button>
+            </form>
+        </div>
+        <form class="form-section" th:action="@{/contactos/{id}/correos(id=${contact.id})}"
+              th:object="${emailForm}" method="post">
+            <h3>Agregar correo electrónico</h3>
+            <label>Correo <input type="email" th:field="*{email}" required></label>
+            <button type="submit">+ Agregar email</button>
+        </form>
+    </section>
+</main>
+<script th:src="@{/js/contact-collections.js}" defer></script>
+<script th:src="@{/js/photo-validation.js}" defer></script>
+</body>
+</html>

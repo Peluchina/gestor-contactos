@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Búsqueda de contactos | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
+<main>
+    <a class="button button--secondary" th:href="@{/contactos}">Volver a contactos</a>
+    <h1>Buscar por documento</h1>
+    <form class="panel" th:action="@{/contactos/buscar}" method="get">
+        <label>Tipo de documento
+            <select name="documentType" required>
+                <option value="DNI" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).DNI}">DNI</option>
+                <option value="CARNET_EXTRANJERIA" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).CARNET_EXTRANJERIA}">Carnet de Extranjería</option>
+                <option value="RUC" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).RUC}">RUC</option>
+            </select>
+        </label>
+        <label>Número <input name="documentNumber" type="text"
+                             th:value="${crossRelationContact == true ? '' : searchedDocumentNumber}" required></label>
+        <button type="submit">Buscar</button>
+    </form>
+    <p th:if="${resultMessage}" class="alert alert--info" th:text="${resultMessage}" role="status"></p>
+    <section class="detail-section" th:if="${contact != null and crossRelationContact == true}">
+        <h2 th:text="${contact.displayName}"></h2>
+        <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
+        <p>Se encontró un contacto existente. Puedes agregarle la relación comercial que gestionas.</p>
+        <form th:if="${canAddClient and !clientAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/cliente(id=${contact.id})}" method="post">
+            <button type="submit">Agregar como cliente</button>
+        </form>
+        <form th:if="${canAddSupplier and !supplierAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/proveedor(id=${contact.id})}" method="post">
+            <button type="submit">Agregar como proveedor</button>
+        </form>
+    </section>
+    <section class="detail-section" th:if="${contact != null and crossRelationContact != true}">
+        <h2 th:text="${contact.displayName}"></h2>
+        <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
+        <p th:if="${!restrictedView}">Dirección: <span th:text="${contact.address}"></span></p>
+        <p>Documento: <span th:text="${contact.documentType + ' ' + contact.documentNumber}"></span></p>
+        <p>Estado: <span th:text="${contact.status}"></span></p>
+        <p>Relaciones: <span th:text="${contact.commercialTypes}"></span></p>
+        <a th:if="${canViewDetails}" th:href="@{/contactos/{id}(id=${contact.id})}">Consultar detalle</a>
+        <form th:if="${canAddClient and !clientAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/cliente(id=${contact.id})}" method="post">
+            <button type="submit">Agregar CLIENTE</button>
+        </form>
+        <form th:if="${canAddSupplier and !supplierAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/proveedor(id=${contact.id})}" method="post">
+            <button type="submit">Agregar PROVEEDOR</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

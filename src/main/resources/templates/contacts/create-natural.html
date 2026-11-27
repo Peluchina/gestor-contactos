@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crear persona natural | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+    <link rel="stylesheet" th:href="@{/css/contact-document-validation.css}">
+</head>
+<body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
+<main>
+    <h1>Crear persona natural</h1>
+    <p class="page-intro">Completa los datos de identidad, ubicación y contacto. Los campos marcados con * son obligatorios.</p>
+        <form th:action="@{/contactos/natural}" th:object="${form}" method="post" enctype="multipart/form-data"
+          data-document-validation data-phone-form>
+        <div th:if="${#fields.hasGlobalErrors()}" class="alert alert--error" role="alert">
+            <p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
+        </div>
+        <fieldset class="form-section">
+            <legend>Identidad de la persona</legend>
+            <div class="form-grid">
+                <label>Nombres * <input type="text" th:field="*{firstNames}" required></label>
+                <label>Apellidos * <input type="text" th:field="*{lastNames}" required></label>
+                <label>Tipo de documento *
+                    <select id="document-type" data-document-type th:field="*{documentType}" required>
+                        <option value="DNI">DNI</option>
+                        <option value="CARNET_EXTRANJERIA">Carnet de Extranjería</option>
+                    </select>
+                </label>
+                <div>
+                    <label for="document-number">Número de documento *</label>
+                    <input id="document-number" class="document-number-input" data-document-number
+                           type="text" th:field="*{documentNumber}" inputmode="numeric" maxlength="8"
+                           pattern="[0-9]{8}" aria-describedby="document-number-feedback" required>
+                    <p id="document-number-feedback" class="document-feedback" data-document-feedback
+                       aria-live="polite" role="status"></p>
+                </div>
+            </div>
+        </fieldset>
+        <fieldset class="form-section">
+            <legend>Ubicación y fotografía</legend>
+            <label>Dirección * <input type="text" th:field="*{address}" required></label>
+            <label for="photo-natural">Fotografía (opcional)</label>
+            <input id="photo-natural" type="file" name="photo" data-photo-input
+                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                   aria-describedby="photo-natural-help photo-natural-feedback">
+            <p class="photo-field-help" id="photo-natural-help">Tamaño máximo: 2 MB.</p>
+            <p class="photo-field-feedback" id="photo-natural-feedback" data-photo-feedback
+               role="alert" aria-live="polite"></p>
+        </fieldset>
+        <fieldset class="form-section">
+            <legend>Teléfonos</legend>
+            <div id="phone-rows" data-collection="phones">
+                <fieldset th:each="phone, item : ${form.phones}" data-row data-phone-row>
+                    <legend th:text="${'Teléfono ' + (item.index + 1)}"></legend>
+                    <label th:for="${'phone-type-' + item.index}">Tipo</label>
+                    <select th:id="${'phone-type-' + item.index}" data-phone-type
+                            th:name="${'phones[' + item.index + '].phoneType'}" required>
+                        <option value="CELULAR" th:selected="${phone.phoneType == T(com.gestorcontactos.gestor_contactos.entity.PhoneType).CELULAR}">Celular</option>
+                        <option value="FIJO" th:selected="${phone.phoneType == T(com.gestorcontactos.gestor_contactos.entity.PhoneType).FIJO}">Fijo</option>
+                    </select>
+                    <div class="phone-area-field" data-phone-area-field>
+                        <label th:for="${'phone-area-' + item.index}">Código de área</label>
+                        <input class="phone-input" type="text" th:id="${'phone-area-' + item.index}"
+                               data-phone-area inputmode="numeric" maxlength="3" pattern="[0-9]{2,3}"
+                               th:name="${'phones[' + item.index + '].areaCode'}" th:value="${phone.areaCode}"
+                               th:attr="aria-describedby=${'phone-area-help-' + item.index + ' phone-area-feedback-' + item.index}">
+                        <p class="phone-field-help" th:id="${'phone-area-help-' + item.index}">Para teléfono fijo, ingresa 2 o 3 dígitos.</p>
+                        <p class="phone-field-feedback" th:id="${'phone-area-feedback-' + item.index}"
+                           data-phone-area-feedback aria-live="polite" role="status"></p>
+                    </div>
+                    <label th:for="${'phone-number-' + item.index}"><span data-phone-number-label>Número de celular</span></label>
+                    <input type="text" th:id="${'phone-number-' + item.index}"
+                           class="phone-input" data-phone-number inputmode="numeric" maxlength="9" pattern="[0-9]{9}"
+                           th:name="${'phones[' + item.index + '].phoneNumber'}"
+                           th:value="${phone.phoneNumber}" required
+                           th:attr="aria-describedby=${'phone-number-help-' + item.index + ' phone-number-feedback-' + item.index}">
+                    <p class="phone-field-help" th:id="${'phone-number-help-' + item.index}" data-phone-number-help>Ingresa 9 dígitos. Ejemplo: 987654321</p>
+                    <p class="phone-field-feedback" th:id="${'phone-number-feedback-' + item.index}"
+                       data-phone-number-feedback aria-live="polite" role="status"></p>
+                    <button type="button" data-remove-row>Quitar teléfono</button>
+                </fieldset>
+            </div>
+            <button class="button button--secondary" type="button" data-add-row="phone-rows">+ Agregar teléfono</button>
+        </fieldset>
+        <fieldset class="form-section">
+            <legend>Correos electrónicos</legend>
+            <div id="email-rows" data-collection="emails">
+                <fieldset th:each="email, item : ${form.emails}" data-row>
+                    <legend th:text="${'Correo ' + (item.index + 1)}"></legend>
+                    <label th:for="${'email-' + item.index}">Correo electrónico</label>
+                    <input type="email" th:id="${'email-' + item.index}"
+                           th:name="${'emails[' + item.index + '].email'}" th:value="${email.email}" required>
+                    <button type="button" data-remove-row>Quitar correo</button>
+                </fieldset>
+            </div>
+            <button class="button button--secondary" type="button" data-add-row="email-rows">+ Agregar email</button>
+        </fieldset>
+        <fieldset class="form-section">
+            <legend>Relación comercial *</legend>
+            <label for="commercial-types">Selecciona una o más relaciones comerciales</label>
+            <select id="commercial-types" th:field="*{commercialTypes}" multiple required>
+                <option th:each="type : ${commercialTypes}" th:value="${type}" th:text="${type}"></option>
+            </select>
+        </fieldset>
+        <div class="action-row">
+            <button type="submit">Guardar contacto</button>
+            <a class="button button--secondary" th:href="@{/contactos}">Cancelar</a>
+        </div>
+    </form>
+</main>
+<script th:src="@{/js/contact-collections.js}" defer></script>
+<script th:src="@{/js/document-validation.js}" defer></script>
+<script th:src="@{/js/photo-validation.js}" defer></script>
+</body>
+</html>

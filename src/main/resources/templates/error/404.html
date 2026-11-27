@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recurso no encontrado | Gestor de Contactos</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main>
+    <section class="login-card" aria-labelledby="error-title">
+        <p class="badge badge--inactive">404 · No encontrado</p>
+        <h1 id="error-title">No encontramos lo que buscas</h1>
+        <p>El recurso solicitado no existe o ya no está disponible.</p>
+        <a class="button" th:href="@{/dashboard}">Volver al inicio</a>
+    </section>
+</main>
+</body>
+</html>

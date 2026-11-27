@@ -103,6 +103,8 @@ Una persona jurídica debe registrar:
 - Uno o más correos electrónicos.
 - Fotografía opcional.
 
+La razón social debe tener entre 2 y 200 caracteres, admitir letras, números, espacios y puntuación corporativa habitual, y normalizar espacios iniciales, finales y consecutivos antes de guardarse.
+
 El tipo de documento para una persona jurídica será:
 
 - `RUC`
@@ -323,6 +325,8 @@ Debe almacenar por separado:
 
 - Código de área.
 - Número local.
+
+El código de área debe contener 2 o 3 dígitos y el número local exactamente 7 dígitos. Ambos deben ser numéricos.
 
 No se debe almacenar el código internacional `+51` como parte del número nacional.
 

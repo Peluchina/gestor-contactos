@@ -4,13 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Crear usuario | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
 <main>
-    <p><a th:href="@{/usuarios}">Volver a usuarios</a></p>
+    <a class="button button--secondary" th:href="@{/usuarios}">Cancelar y volver a usuarios</a>
     <h1>Crear usuario</h1>
-    <form th:action="@{/usuarios}" th:object="${form}" method="post">
-        <p th:if="${#fields.hasGlobalErrors()}" th:each="error : ${#fields.globalErrors()}" th:text="${error}" role="alert"></p>
+    <form class="form-section" th:action="@{/usuarios}" th:object="${form}" method="post">
+        <p th:if="${#fields.hasGlobalErrors()}" class="alert alert--error" th:each="error : ${#fields.globalErrors()}" th:text="${error}" role="alert"></p>
         <label for="username">Username</label>
         <input id="username" type="text" th:field="*{username}" minlength="4" maxlength="50" required>
         <p th:if="${#fields.hasErrors('username')}" th:errors="*{username}" role="alert"></p>
@@ -23,7 +25,8 @@
             <option th:each="role : ${roles}" th:value="${role}" th:text="${role}"></option>
         </select>
         <p th:if="${#fields.hasErrors('role')}" th:errors="*{role}" role="alert"></p>
-        <button type="submit">Crear</button>
+        <div class="action-row"><button type="submit">Guardar usuario</button>
+            <a class="button button--secondary" th:href="@{/usuarios}">Cancelar</a></div>
     </form>
 </main>
 </body>

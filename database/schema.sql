@@ -160,8 +160,8 @@ CREATE INDEX idx_contacts_legal_name
 --   phone_number = 9 dígitos
 --
 -- Para FIJO:
---   area_code = código de área
---   phone_number = número local
+--   area_code = 2 o 3 dígitos numéricos
+--   phone_number = 7 dígitos numéricos
 --
 -- El +51 NO se almacena como parte del número nacional.
 -- ============================================================
@@ -172,7 +172,7 @@ CREATE TABLE contact_phones (
     contact_id BIGINT NOT NULL,
 
     phone_type VARCHAR(10) NOT NULL,
-    area_code VARCHAR(5) NOT NULL DEFAULT '',
+    area_code VARCHAR(3) NOT NULL DEFAULT '',
     phone_number VARCHAR(9) NOT NULL,
 
     CONSTRAINT pk_contact_phones PRIMARY KEY (id),

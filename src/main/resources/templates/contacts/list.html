@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contactos | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
+<main>
+    <h1 sec:authorize="hasRole('ADMINISTRADOR')">Contactos</h1>
+    <h1 sec:authorize="hasRole('VENDEDOR')">Clientes</h1>
+    <h1 sec:authorize="hasRole('COMPRAS')">Proveedores</h1>
+    <h1 sec:authorize="hasRole('ALMACENERO')">Contactos activos</h1>
+    <p class="page-intro" sec:authorize="!hasRole('ALMACENERO')">Consulta contactos según tus permisos. Los registros eliminados no aparecen en este listado.</p>
+    <p class="page-intro" sec:authorize="hasRole('ALMACENERO')">Consulta únicamente nombres y direcciones de contactos activos.</p>
+    <p th:if="${success}" class="alert alert--success" th:text="${success}" role="status"></p>
+    <p th:if="${error}" class="alert alert--error" th:text="${error}" role="alert"></p>
+    <div class="toolbar">
+        <div class="action-row">
+            <a class="button" th:if="${canCreateNatural}" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/natural}">Crear persona natural</a>
+            <a class="button" th:if="${canCreateNatural}" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/nuevo/natural}">Crear cliente natural</a>
+            <a class="button" th:if="${canCreateNatural}" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/nuevo/natural}">Crear proveedor natural</a>
+            <a class="button" th:if="${canCreateLegal}" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/juridica}">Crear persona jurídica</a>
+            <a class="button" th:if="${canCreateLegal}" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/nuevo/juridica}">Crear cliente jurídico</a>
+            <a class="button" th:if="${canCreateLegal}" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/nuevo/juridica}">Crear proveedor jurídico</a>
+            <a class="button button--secondary" th:if="${canSearch}" th:href="@{/contactos/buscar}">Buscar por documento</a>
+            <a class="button button--secondary" th:if="${canViewDeletedContacts}" th:href="@{/contactos/eliminados}">Contactos eliminados</a>
+        </div>
+        <div class="form-grid">
+        <label for="contact-search">Filtrar contactos
+                <input id="contact-search" type="search" data-contact-search placeholder="Nombre, dirección o documento">
+            </label>
+            <label sec:authorize="hasRole('ADMINISTRADOR')" for="commercial-filter">Tipo comercial
+                <select id="commercial-filter" data-commercial-filter>
+                    <option value="">Todos</option>
+                    <option value="CLIENTE">Clientes</option>
+                    <option value="PROVEEDOR">Proveedores</option>
+                </select>
+            </label>
+        </div>
+    </div>
+    <div class="table-scroll">
+    <table>
+        <thead>
+        <tr><th th:unless="${restrictedView}">Tipo</th><th>Nombre</th><th>Dirección</th>
+            <th th:unless="${restrictedView}">Documento</th><th>Estado</th><th>Detalle</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="contact : ${contacts}" data-contact-row
+            th:attr="data-status=${restrictedView ? null : contact.status},data-commercial-types=${restrictedView ? '' : contact.commercialTypes}">
+            <td th:unless="${restrictedView}" th:text="${contact.personType}"></td>
+            <td th:text="${contact.displayName}"></td>
+            <td th:text="${contact.address}"></td>
+            <td th:unless="${restrictedView}"
+                th:text="${contact.documentType + ' ' + contact.documentNumber}"></td>
+            <td th:if="${restrictedView}"><span class="badge badge--active">ACTIVO</span></td>
+            <td th:unless="${restrictedView}">
+                <span class="badge" th:classappend="${contact.status.name() == 'ACTIVO'} ? 'badge--active' : 'badge--inactive'"
+                      th:text="${contact.status}"></span>
+            </td>
+            <td><a class="button button--secondary" th:href="@{/contactos/{id}(id=${contact.id})}">Consultar</a></td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(contacts)}"><td class="empty-state" th:attr="colspan=${restrictedView ? 3 : 6}">Aún no hay contactos disponibles.</td></tr>
+        <tr th:if="${!#lists.isEmpty(contacts)}" data-filter-empty hidden>
+            <td class="empty-state" th:attr="colspan=${restrictedView ? 3 : 6}">No hay contactos que coincidan con los filtros.</td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+</main>
+<script th:src="@{/js/contact-list.js}" defer></script>
+</body>
+</html>

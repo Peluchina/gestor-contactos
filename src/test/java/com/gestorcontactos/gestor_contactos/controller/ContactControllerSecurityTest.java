@@ -665,7 +665,7 @@ class ContactControllerSecurityTest {
     }
 
     @Test
-    void sellerCanSearchActiveClientsWithoutSeeingContactsOutsideItsScope() throws Exception {
+    void sellerCanSearchClientsAndOnlyMinimalDetailsOfSupplierForCrossRelation() throws Exception {
         User seller = actor("seller-search", Role.VENDEDOR);
         Contact client = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
                 "Av. Perú 123", LocalDateTime.now(), seller);
@@ -678,7 +678,9 @@ class ContactControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("María Pérez")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/contactos/86")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"12345678\"")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"12345678\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("/contactos/86/relaciones/cliente"))));
 
         Contact supplier = new Contact(PersonType.NATURAL, "Persona privada", "Proveedor", DocumentType.DNI,
                 "87654321", "Av. Privada 1", LocalDateTime.now(), seller);
@@ -688,9 +690,115 @@ class ContactControllerSecurityTest {
                         .param("documentType", "DNI").param("documentNumber", "87654321"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "Persona privada Proveedor")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Agregar como cliente")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Documento:"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Relaciones:"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Av. Privada 1"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("87654321"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("/contactos/87654321"))))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")));
+    }
+
+    @Test
+    void sellerCanSubmitCrossRelationForExistingSupplierWithoutCreatingAnotherContact() throws Exception {
+        User seller = actor("seller-cross-relation", Role.VENDEDOR);
+        Contact supplier = new Contact(PersonType.NATURAL, "Persona privada", "Proveedor", DocumentType.DNI,
+                "87654321", "Av. Privada 1", LocalDateTime.now(), seller);
+        supplier.addCommercialType(CommercialType.PROVEEDOR);
+        setEntityId(supplier, 87L);
+        when(userService.findByUsername(seller.getUsername())).thenReturn(Optional.of(seller));
+        when(contactService.addCommercialType(87L, CommercialType.CLIENTE, seller)).thenReturn(supplier);
+
+        mockMvc.perform(post("/contactos/87/relaciones/cliente")
+                        .with(user(new CustomUserDetails(seller))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos"));
+
+        verify(contactService).addCommercialType(87L, CommercialType.CLIENTE, seller);
+        verify(contactService, never()).createNaturalContact(any(CreateNaturalContactRequest.class), eq(seller));
+    }
+
+    @Test
+    void purchasingCanSearchAndSubmitCrossRelationForExistingClientWithMinimalDetails() throws Exception {
+        User buyer = actor("buyer-cross-relation", Role.COMPRAS);
+        Contact client = new Contact(PersonType.JURIDICA, "Empresa confidencial S.A.C.", DocumentType.RUC,
+                "20123456789", "Av. Reservada 123", LocalDateTime.now(), buyer);
+        client.addCommercialType(CommercialType.CLIENTE);
+        setEntityId(client, 88L);
+        when(userService.findByUsername(buyer.getUsername())).thenReturn(Optional.of(buyer));
+        when(contactService.findByIdentity(DocumentType.RUC, "20123456789")).thenReturn(Optional.of(client));
+        when(contactService.addCommercialType(88L, CommercialType.PROVEEDOR, buyer)).thenReturn(client);
+
+        mockMvc.perform(get("/contactos/buscar").with(user(new CustomUserDetails(buyer)))
+                        .param("documentType", "RUC").param("documentNumber", "20123456789"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Empresa confidencial S.A.C.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Agregar como proveedor")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Documento:"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Relaciones:"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Av. Reservada 123"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("20123456789"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Consultar detalle"))));
+
+        mockMvc.perform(post("/contactos/88/relaciones/proveedor")
+                        .with(user(new CustomUserDetails(buyer))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/contactos"));
+
+        verify(contactService).addCommercialType(88L, CommercialType.PROVEEDOR, buyer);
+        verify(contactService, never()).createLegalContact(any(CreateLegalContactRequest.class), eq(buyer));
+    }
+
+    @Test
+    void deletedContactSearchDoesNotOfferCrossRelation() throws Exception {
+        User seller = actor("seller-deleted-cross", Role.VENDEDOR);
+        Contact deletedSupplier = new Contact(PersonType.NATURAL, "Nombre reservado", "Proveedor", DocumentType.DNI,
+                "87654321", "Av. Privada 1", LocalDateTime.now(), seller);
+        deletedSupplier.addCommercialType(CommercialType.PROVEEDOR);
+        deletedSupplier.setDeletedAt(LocalDateTime.now());
+        when(userService.findByUsername(seller.getUsername())).thenReturn(Optional.of(seller));
+        when(contactService.findByIdentity(DocumentType.DNI, "87654321")).thenReturn(Optional.of(deletedSupplier));
+
+        mockMvc.perform(get("/contactos/buscar").with(user(new CustomUserDetails(seller)))
+                        .param("documentType", "DNI").param("documentNumber", "87654321"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "La identidad ya está registrada y no se puede crear un contacto duplicado.")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("Persona privada"))));
+                        org.hamcrest.Matchers.containsString("Nombre reservado"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Agregar como cliente"))));
+    }
+
+    @Test
+    void purchasingSearchDoesNotOfferAlreadyAssignedSupplierRelation() throws Exception {
+        User buyer = actor("buyer-existing-supplier", Role.COMPRAS);
+        Contact supplier = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
+                "Av. Perú 123", LocalDateTime.now(), buyer);
+        supplier.addCommercialType(CommercialType.PROVEEDOR);
+        setEntityId(supplier, 89L);
+        when(userService.findByUsername(buyer.getUsername())).thenReturn(Optional.of(buyer));
+        when(contactService.findByIdentity(DocumentType.DNI, "12345678")).thenReturn(Optional.of(supplier));
+
+        mockMvc.perform(get("/contactos/buscar").with(user(new CustomUserDetails(buyer)))
+                        .param("documentType", "DNI").param("documentNumber", "12345678"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("María Pérez")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("/contactos/89/relaciones/proveedor"))));
+
+        verify(contactService, never()).addCommercialType(89L, CommercialType.PROVEEDOR, buyer);
     }
 
     private void mockNaturalCreation(User actor, Set<CommercialType> commercialTypes) {

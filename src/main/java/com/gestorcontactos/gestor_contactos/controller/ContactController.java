@@ -1,6 +1,7 @@
 package com.gestorcontactos.gestor_contactos.controller;
 
 import com.gestorcontactos.gestor_contactos.dto.ContactDetailsView;
+import com.gestorcontactos.gestor_contactos.dto.ContactAssociationLookupView;
 import com.gestorcontactos.gestor_contactos.dto.ContactEditView;
 import com.gestorcontactos.gestor_contactos.dto.ContactEmailEditView;
 import com.gestorcontactos.gestor_contactos.dto.ContactEmailRequest;
@@ -160,6 +161,7 @@ public class ContactController {
             @AuthenticationPrincipal CustomUserDetails currentUser,
             Model model) {
         User actor = authenticatedUser(currentUser);
+        model.addAttribute("crossRelationContact", false);
         model.addAttribute("searchedDocumentType", documentType);
         model.addAttribute("searchedDocumentNumber", documentNumber);
         if (documentType == null || documentNumber == null || documentNumber.isBlank()) {
@@ -182,12 +184,23 @@ public class ContactController {
             model.addAttribute("restrictedView", false);
             model.addAttribute("canViewDetails", true);
         } else {
-            boolean withinRoleScope = contact.getStatus() == ContactStatus.ACTIVO
-                    && (actor.getRole() == Role.VENDEDOR
-                            && contact.getCommercialTypes().contains(CommercialType.CLIENTE)
-                    || actor.getRole() == Role.COMPRAS
-                            && contact.getCommercialTypes().contains(CommercialType.PROVEEDOR));
+            CommercialType actorType = commercialTypeForRole(actor.getRole());
+            CommercialType oppositeType = oppositeCommercialType(actorType);
+            boolean active = contact.getStatus() == ContactStatus.ACTIVO;
+            boolean withinRoleScope = active && actorType != null
+                    && contact.getCommercialTypes().contains(actorType);
+            boolean canAssociateCrossRelation = active && actorType != null && oppositeType != null
+                    && !contact.getCommercialTypes().contains(actorType)
+                    && contact.getCommercialTypes().contains(oppositeType);
             if (!withinRoleScope) {
+                if (canAssociateCrossRelation) {
+                    model.addAttribute("contact", toAssociationLookupView(contact));
+                    model.addAttribute("restrictedView", true);
+                    model.addAttribute("canViewDetails", false);
+                    model.addAttribute("crossRelationContact", true);
+                    addRelationActions(model, actor.getRole(), contact);
+                    return "contacts/search-result";
+                }
                 model.addAttribute("resultMessage",
                         "La identidad ya está registrada y no se puede crear un contacto duplicado.");
                 return "contacts/search-result";
@@ -536,6 +549,25 @@ public class ContactController {
         return new ContactIdentityLookupView(contact.getId(), contact.getPersonType(), displayName(contact),
                 contact.getDocumentType(), contact.getDocumentNumber(), contact.getStatus(),
                 Set.copyOf(contact.getCommercialTypes()));
+    }
+
+    private ContactAssociationLookupView toAssociationLookupView(Contact contact) {
+        return new ContactAssociationLookupView(contact.getId(), contact.getPersonType(), displayName(contact));
+    }
+
+    private CommercialType commercialTypeForRole(Role role) {
+        return switch (role) {
+            case VENDEDOR -> CommercialType.CLIENTE;
+            case COMPRAS -> CommercialType.PROVEEDOR;
+            case ADMINISTRADOR, ALMACENERO -> null;
+        };
+    }
+
+    private CommercialType oppositeCommercialType(CommercialType commercialType) {
+        if (commercialType == null) {
+            return null;
+        }
+        return commercialType == CommercialType.CLIENTE ? CommercialType.PROVEEDOR : CommercialType.CLIENTE;
     }
 
     private String displayName(Contact contact) {

@@ -19,11 +19,25 @@
                 <option value="RUC" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).RUC}">RUC</option>
             </select>
         </label>
-        <label>Número <input name="documentNumber" type="text" th:value="${searchedDocumentNumber}" required></label>
+        <label>Número <input name="documentNumber" type="text"
+                             th:value="${crossRelationContact == true ? '' : searchedDocumentNumber}" required></label>
         <button type="submit">Buscar</button>
     </form>
     <p th:if="${resultMessage}" class="alert alert--info" th:text="${resultMessage}" role="status"></p>
-    <section class="detail-section" th:if="${contact}">
+    <section class="detail-section" th:if="${contact != null and crossRelationContact == true}">
+        <h2 th:text="${contact.displayName}"></h2>
+        <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
+        <p>Se encontró un contacto existente. Puedes agregarle la relación comercial que gestionas.</p>
+        <form th:if="${canAddClient and !clientAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/cliente(id=${contact.id})}" method="post">
+            <button type="submit">Agregar como cliente</button>
+        </form>
+        <form th:if="${canAddSupplier and !supplierAlreadyAssigned}"
+              th:action="@{/contactos/{id}/relaciones/proveedor(id=${contact.id})}" method="post">
+            <button type="submit">Agregar como proveedor</button>
+        </form>
+    </section>
+    <section class="detail-section" th:if="${contact != null and crossRelationContact != true}">
         <h2 th:text="${contact.displayName}"></h2>
         <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
         <p th:if="${!restrictedView}">Dirección: <span th:text="${contact.address}"></span></p>

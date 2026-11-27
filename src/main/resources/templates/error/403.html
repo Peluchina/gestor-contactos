@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Acceso denegado | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
+<main>
+    <section class="panel">
+        <p class="badge badge--inactive">403 · Acceso denegado</p>
+        <h1>No tienes permiso para realizar esta acción</h1>
+        <p class="muted">Tu rol no tiene acceso a esta página o función.</p>
+        <a class="button" th:href="@{/dashboard}">Volver al inicio</a>
+    </section>
+</main>
+</body>
+</html>

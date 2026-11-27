@@ -4,15 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Editar contacto | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
 <main>
-    <a th:href="@{/contactos/{id}(id=${contact.id})}">Volver al contacto</a>
+    <a class="button button--secondary" th:href="@{/contactos/{id}(id=${contact.id})}">Cancelar y volver al contacto</a>
     <h1>Editar contacto</h1>
-    <p th:if="${success}" th:text="${success}" role="status"></p>
-    <p th:if="${error}" th:text="${error}" role="alert"></p>
+    <p class="page-intro">La identidad es inmutable. Solo puedes modificar dirección, teléfonos, correos y fotografía.</p>
+    <p th:if="${success}" class="alert alert--success" th:text="${success}" role="status"></p>
+    <p th:if="${error}" class="alert alert--error" th:text="${error}" role="alert"></p>
 
-    <section aria-labelledby="identity-title">
+    <section class="form-section" aria-labelledby="identity-title">
         <h2 id="identity-title">Identidad (no editable)</h2>
         <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
         <label th:if="${contact.personType.name() == 'NATURAL'}">Nombres
@@ -32,12 +35,12 @@
         </label>
     </section>
 
-    <section aria-labelledby="editable-title">
+    <section class="form-section" aria-labelledby="editable-title">
         <h2 id="editable-title">Datos editables</h2>
         <p>Estado: <span th:text="${contact.status}"></span></p>
         <p>Relaciones comerciales: <span th:text="${contact.commercialTypes}"></span></p>
         <form th:action="@{/contactos/{id}/editar(id=${contact.id})}" th:object="${form}" method="post">
-            <div th:if="${#fields.hasGlobalErrors()}" role="alert">
+            <div th:if="${#fields.hasGlobalErrors()}" class="alert alert--error" role="alert">
                 <p th:each="fieldError : ${#fields.globalErrors()}" th:text="${fieldError}"></p>
             </div>
             <label>Dirección <input type="text" th:field="*{address}" required></label>
@@ -45,10 +48,10 @@
         </form>
     </section>
 
-    <section aria-labelledby="photo-title">
+    <section class="form-section" aria-labelledby="photo-title">
         <h2 id="photo-title">Fotografía</h2>
         <figure th:if="${photoUrl}">
-            <img th:src="${photoUrl}" alt="Fotografía del contacto">
+            <img class="contact-photo" th:src="${photoUrl}" alt="Fotografía del contacto">
         </figure>
         <p th:unless="${photoUrl}">Este contacto no tiene fotografía.</p>
         <form th:action="@{/contactos/{id}/foto(id=${contact.id})}" method="post" enctype="multipart/form-data">
@@ -62,9 +65,9 @@
         </form>
     </section>
 
-    <section aria-labelledby="phones-title">
+    <section class="form-section" aria-labelledby="phones-title">
         <h2 id="phones-title">Teléfonos</h2>
-        <div th:each="phone : ${contact.phones}">
+        <div class="detail-section" th:each="phone : ${contact.phones}">
             <form th:action="@{/contactos/{id}/telefonos/{phoneId}/editar(id=${contact.id},phoneId=${phone.id})}"
                   method="post">
                 <label>Tipo
@@ -82,7 +85,7 @@
                 <button type="submit">Eliminar teléfono</button>
             </form>
         </div>
-        <form th:action="@{/contactos/{id}/telefonos(id=${contact.id})}"
+        <form class="form-section" th:action="@{/contactos/{id}/telefonos(id=${contact.id})}"
               th:object="${phoneForm}" method="post">
             <h3>Agregar teléfono</h3>
             <label>Tipo
@@ -93,13 +96,13 @@
             </label>
             <label>Código de área <input type="text" th:field="*{areaCode}"></label>
             <label>Número <input type="text" th:field="*{phoneNumber}" required></label>
-            <button type="submit">Agregar teléfono</button>
+            <button type="submit">+ Agregar teléfono</button>
         </form>
     </section>
 
-    <section aria-labelledby="emails-title">
+    <section class="form-section" aria-labelledby="emails-title">
         <h2 id="emails-title">Correos electrónicos</h2>
-        <div th:each="email : ${contact.emails}">
+        <div class="detail-section" th:each="email : ${contact.emails}">
             <form th:action="@{/contactos/{id}/correos/{emailId}/editar(id=${contact.id},emailId=${email.id})}"
                   method="post">
                 <label>Correo <input type="email" name="email" th:value="${email.email}" required></label>
@@ -110,11 +113,11 @@
                 <button type="submit">Eliminar correo</button>
             </form>
         </div>
-        <form th:action="@{/contactos/{id}/correos(id=${contact.id})}"
+        <form class="form-section" th:action="@{/contactos/{id}/correos(id=${contact.id})}"
               th:object="${emailForm}" method="post">
             <h3>Agregar correo electrónico</h3>
             <label>Correo <input type="email" th:field="*{email}" required></label>
-            <button type="submit">Agregar correo</button>
+            <button type="submit">+ Agregar email</button>
         </form>
     </section>
 </main>

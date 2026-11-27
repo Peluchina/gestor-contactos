@@ -4,17 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Inicio | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
 <main>
-    <h1>Gestor de Contactos</h1>
-    <p>Sesión iniciada como <span sec:authentication="name"></span>.</p>
-    <nav>
-        <a sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/usuarios}">Administrar usuarios</a>
-    </nav>
-    <form th:action="@{/logout}" method="post">
-        <button type="submit">Cerrar sesión</button>
-    </form>
+    <h1>Bienvenido, <span sec:authentication="name"></span></h1>
+    <p class="page-intro">
+        <span sec:authorize="hasRole('ADMINISTRADOR')">Rol: ADMINISTRADOR. Gestiona contactos y usuarios desde los accesos rápidos.</span>
+        <span sec:authorize="hasRole('VENDEDOR')">Rol: VENDEDOR. Accede a clientes y a las funciones de creación y consulta disponibles.</span>
+        <span sec:authorize="hasRole('COMPRAS')">Rol: COMPRAS. Accede a proveedores y a las funciones de creación y consulta disponibles.</span>
+        <span sec:authorize="hasRole('ALMACENERO')">Rol: ALMACENERO. Consulta los contactos activos con la información permitida.</span>
+    </p>
+    <section class="card-grid" aria-label="Accesos rápidos">
+        <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos}">
+            <span class="card__title">Contactos</span><span class="card__description">Consultar clientes y proveedores.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/natural}">
+            <span class="card__title">Crear persona natural</span><span class="card__description">Registrar una persona y sus relaciones comerciales.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/juridica}">
+            <span class="card__title">Crear persona jurídica</span><span class="card__description">Registrar una empresa o entidad.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/eliminados}">
+            <span class="card__title">Contactos eliminados</span><span class="card__description">Consultar o recuperar registros.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/usuarios}">
+            <span class="card__title">Administrar usuarios</span><span class="card__description">Gestionar usuarios y sus roles.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos}">
+            <span class="card__title">Clientes</span><span class="card__description">Consultar clientes activos.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/nuevo/natural}">
+            <span class="card__title">Crear cliente</span><span class="card__description">Registrar una persona natural como cliente.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/buscar}">
+            <span class="card__title">Buscar por documento</span><span class="card__description">Consultar identidad y validar duplicados.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos}">
+            <span class="card__title">Proveedores</span><span class="card__description">Consultar proveedores activos.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/nuevo/juridica}">
+            <span class="card__title">Crear proveedor</span><span class="card__description">Registrar una persona jurídica como proveedor.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/buscar}">
+            <span class="card__title">Buscar por documento</span><span class="card__description">Consultar identidad y validar duplicados.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('ALMACENERO')" th:href="@{/contactos}">
+            <span class="card__title">Contactos activos</span><span class="card__description">Consultar únicamente la información permitida.</span>
+        </a>
+    </section>
 </main>
 </body>
 </html>

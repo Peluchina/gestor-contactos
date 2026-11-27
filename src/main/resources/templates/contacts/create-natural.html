@@ -4,36 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Crear persona natural | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
     <link rel="stylesheet" th:href="@{/css/contact-document-validation.css}">
 </head>
 <body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
 <main>
     <h1>Crear persona natural</h1>
-    <a th:href="@{/contactos}">Volver a contactos</a>
+    <p class="page-intro">Completa los datos de identidad, ubicación y contacto. Los campos marcados con * son obligatorios.</p>
     <form th:action="@{/contactos/natural}" th:object="${form}" method="post" enctype="multipart/form-data"
           data-document-validation>
-        <div th:if="${#fields.hasGlobalErrors()}" role="alert">
+        <div th:if="${#fields.hasGlobalErrors()}" class="alert alert--error" role="alert">
             <p th:each="error : ${#fields.globalErrors()}" th:text="${error}"></p>
         </div>
-        <label>Nombres <input type="text" th:field="*{firstNames}" required></label>
-        <label>Apellidos <input type="text" th:field="*{lastNames}" required></label>
-        <label>Tipo de documento
-            <select id="document-type" data-document-type th:field="*{documentType}" required>
-                <option value="DNI">DNI</option>
-                <option value="CARNET_EXTRANJERIA">Carnet de Extranjería</option>
-            </select>
-        </label>
-        <label for="document-number">Número de documento</label>
-        <input id="document-number" class="document-number-input" data-document-number
-               type="text" th:field="*{documentNumber}" inputmode="numeric" maxlength="8"
-               pattern="[0-9]{8}" aria-describedby="document-number-feedback" required>
-        <p id="document-number-feedback" class="document-feedback" data-document-feedback
-           aria-live="polite" role="status"></p>
-        <label>Dirección <input type="text" th:field="*{address}" required></label>
-        <label>Fotografía (opcional)
+        <fieldset class="form-section">
+            <legend>Identidad de la persona</legend>
+            <div class="form-grid">
+                <label>Nombres * <input type="text" th:field="*{firstNames}" required></label>
+                <label>Apellidos * <input type="text" th:field="*{lastNames}" required></label>
+                <label>Tipo de documento *
+                    <select id="document-type" data-document-type th:field="*{documentType}" required>
+                        <option value="DNI">DNI</option>
+                        <option value="CARNET_EXTRANJERIA">Carnet de Extranjería</option>
+                    </select>
+                </label>
+                <div>
+                    <label for="document-number">Número de documento *</label>
+                    <input id="document-number" class="document-number-input" data-document-number
+                           type="text" th:field="*{documentNumber}" inputmode="numeric" maxlength="8"
+                           pattern="[0-9]{8}" aria-describedby="document-number-feedback" required>
+                    <p id="document-number-feedback" class="document-feedback" data-document-feedback
+                       aria-live="polite" role="status"></p>
+                </div>
+            </div>
+        </fieldset>
+        <fieldset class="form-section">
+            <legend>Ubicación y fotografía</legend>
+            <label>Dirección * <input type="text" th:field="*{address}" required></label>
+            <label>Fotografía (opcional)
             <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
-        </label>
-        <fieldset>
+            </label>
+        </fieldset>
+        <fieldset class="form-section">
             <legend>Teléfonos</legend>
             <div id="phone-rows" data-collection="phones">
                 <fieldset th:each="phone, item : ${form.phones}" data-row>
@@ -54,9 +66,9 @@
                     <button type="button" data-remove-row>Quitar teléfono</button>
                 </fieldset>
             </div>
-            <button type="button" data-add-row="phone-rows">Agregar teléfono</button>
+            <button class="button button--secondary" type="button" data-add-row="phone-rows">+ Agregar teléfono</button>
         </fieldset>
-        <fieldset>
+        <fieldset class="form-section">
             <legend>Correos electrónicos</legend>
             <div id="email-rows" data-collection="emails">
                 <fieldset th:each="email, item : ${form.emails}" data-row>
@@ -67,14 +79,19 @@
                     <button type="button" data-remove-row>Quitar correo</button>
                 </fieldset>
             </div>
-            <button type="button" data-add-row="email-rows">Agregar correo electrónico</button>
+            <button class="button button--secondary" type="button" data-add-row="email-rows">+ Agregar email</button>
         </fieldset>
-        <label>Relaciones comerciales
-            <select th:field="*{commercialTypes}" multiple required>
+        <fieldset class="form-section">
+            <legend>Relación comercial *</legend>
+            <label for="commercial-types">Selecciona una o más relaciones comerciales</label>
+            <select id="commercial-types" th:field="*{commercialTypes}" multiple required>
                 <option th:each="type : ${commercialTypes}" th:value="${type}" th:text="${type}"></option>
             </select>
-        </label>
-        <button type="submit">Crear contacto</button>
+        </fieldset>
+        <div class="action-row">
+            <button type="submit">Guardar contacto</button>
+            <a class="button button--secondary" th:href="@{/contactos}">Cancelar</a>
+        </div>
     </form>
 </main>
 <script th:src="@{/js/contact-collections.js}" defer></script>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<th:block th:fragment="styles">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</th:block>
+
+<header th:fragment="navbar" class="app-header">
+    <div class="app-header__inner">
+        <a class="app-brand" th:href="@{/dashboard}">Gestor de Contactos</a>
+        <nav class="app-nav" aria-label="Navegación principal">
+            <a th:href="@{/dashboard}">Inicio</a>
+            <details class="nav-dropdown" sec:authorize="hasRole('ADMINISTRADOR')">
+                <summary>Contactos</summary>
+                <div class="nav-dropdown__menu">
+                    <a th:href="@{/contactos}">Todos los contactos</a>
+                    <a th:href="@{/contactos(commercialType='CLIENTE')}">Clientes</a>
+                    <a th:href="@{/contactos(commercialType='PROVEEDOR')}">Proveedores</a>
+                    <a th:href="@{/contactos/eliminados}">Eliminados</a>
+                </div>
+            </details>
+            <a sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos}">Clientes</a>
+            <a sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos}">Proveedores</a>
+            <a sec:authorize="hasRole('ALMACENERO')" th:href="@{/contactos}">Contactos</a>
+            <a sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/usuarios}">Usuarios</a>
+        </nav>
+        <div class="app-account">
+            <span class="app-account__username" sec:authentication="name"></span>
+            <span class="role-badge" sec:authorize="hasRole('ADMINISTRADOR')">ADMINISTRADOR</span>
+            <span class="role-badge" sec:authorize="hasRole('VENDEDOR')">VENDEDOR</span>
+            <span class="role-badge" sec:authorize="hasRole('COMPRAS')">COMPRAS</span>
+            <span class="role-badge" sec:authorize="hasRole('ALMACENERO')">ALMACENERO</span>
+            <form class="logout-form" th:action="@{/logout}" method="post">
+                <button class="button button--secondary" type="submit">Cerrar sesión</button>
+            </form>
+        </div>
+    </div>
+</header>
+</body>
+</html>

@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Búsqueda de contactos | Gestor de Contactos</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
+<header th:replace="~{fragments/layout :: navbar}"></header>
 <main>
-    <a th:href="@{/contactos}">Volver a contactos</a>
+    <a class="button button--secondary" th:href="@{/contactos}">Volver a contactos</a>
     <h1>Buscar por documento</h1>
-    <form th:action="@{/contactos/buscar}" method="get">
+    <form class="panel" th:action="@{/contactos/buscar}" method="get">
         <label>Tipo de documento
             <select name="documentType" required>
                 <option value="DNI" th:selected="${searchedDocumentType == T(com.gestorcontactos.gestor_contactos.entity.DocumentType).DNI}">DNI</option>
@@ -20,8 +22,8 @@
         <label>Número <input name="documentNumber" type="text" th:value="${searchedDocumentNumber}" required></label>
         <button type="submit">Buscar</button>
     </form>
-    <p th:if="${resultMessage}" th:text="${resultMessage}" role="status"></p>
-    <section th:if="${contact}">
+    <p th:if="${resultMessage}" class="alert alert--info" th:text="${resultMessage}" role="status"></p>
+    <section class="detail-section" th:if="${contact}">
         <h2 th:text="${contact.displayName}"></h2>
         <p>Tipo de persona: <span th:text="${contact.personType}"></span></p>
         <p th:if="${!restrictedView}">Dirección: <span th:text="${contact.address}"></span></p>

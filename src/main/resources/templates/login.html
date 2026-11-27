@@ -4,22 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Iniciar sesión | Gestor de Contactos</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 28rem; margin: 4rem auto; padding: 0 1rem; color: #1f2937; }
-        form { display: grid; gap: 1rem; }
-        label { display: grid; gap: .4rem; }
-        input, button { font: inherit; padding: .7rem; }
-        button { cursor: pointer; }
-        .message { color: #b42318; }
-        .success { color: #067647; }
-    </style>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
-<main>
+<main class="login-page">
+    <section class="login-card">
+    <p class="card__title">Gestor de Contactos</p>
     <h1>Iniciar sesión</h1>
-    <p th:if="${param.error}" class="message" role="alert">Usuario o contraseña incorrectos</p>
-    <p th:if="${param.logout}" class="success">Sesión cerrada correctamente.</p>
-    <p th:if="${param.expired}" class="message" role="alert">La sesión terminó. Inicia sesión nuevamente.</p>
+    <p th:if="${param.error}" class="alert alert--error" role="alert">Usuario o contraseña incorrectos</p>
+    <p th:if="${param.logout}" class="alert alert--success" role="status">Sesión cerrada correctamente.</p>
+    <p th:if="${param.expired}" class="alert alert--error" role="alert">La sesión terminó. Inicia sesión nuevamente.</p>
     <form th:action="@{/login}" method="post">
         <label for="username">Usuario
             <input id="username" name="username" type="text" autocomplete="username" required autofocus>
@@ -27,8 +21,9 @@
         <label for="password">Contraseña
             <input id="password" name="password" type="password" autocomplete="current-password" required>
         </label>
-        <button type="submit">Entrar</button>
+        <button type="submit">Iniciar sesión</button>
     </form>
+    </section>
 </main>
 </body>
 </html>

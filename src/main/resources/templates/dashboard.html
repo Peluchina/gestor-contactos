@@ -21,10 +21,10 @@
             <span class="card__title">Contactos</span><span class="card__description">Consultar clientes y proveedores.</span>
         </a>
         <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/natural}">
-            <span class="card__title">Crear persona natural</span><span class="card__description">Registrar una persona y sus relaciones comerciales.</span>
+            <span class="card__title">Crear persona natural</span><span class="card__description">Registrar una persona como cliente, proveedor o ambos.</span>
         </a>
         <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/juridica}">
-            <span class="card__title">Crear persona jurídica</span><span class="card__description">Registrar una empresa o entidad.</span>
+            <span class="card__title">Crear persona jurídica</span><span class="card__description">Registrar una empresa como cliente, proveedor o ambos.</span>
         </a>
         <a class="card" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/eliminados}">
             <span class="card__title">Contactos eliminados</span><span class="card__description">Consultar o recuperar registros.</span>
@@ -36,7 +36,10 @@
             <span class="card__title">Clientes</span><span class="card__description">Consultar clientes activos.</span>
         </a>
         <a class="card" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/nuevo/natural}">
-            <span class="card__title">Crear cliente</span><span class="card__description">Registrar una persona natural como cliente.</span>
+            <span class="card__title">Crear cliente natural</span><span class="card__description">Registrar una persona natural como cliente.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/nuevo/juridica}">
+            <span class="card__title">Crear cliente jurídico</span><span class="card__description">Registrar una persona jurídica como cliente.</span>
         </a>
         <a class="card" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/buscar}">
             <span class="card__title">Buscar por documento</span><span class="card__description">Consultar identidad y validar duplicados.</span>
@@ -45,7 +48,10 @@
             <span class="card__title">Proveedores</span><span class="card__description">Consultar proveedores activos.</span>
         </a>
         <a class="card" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/nuevo/juridica}">
-            <span class="card__title">Crear proveedor</span><span class="card__description">Registrar una persona jurídica como proveedor.</span>
+            <span class="card__title">Crear proveedor jurídico</span><span class="card__description">Registrar una persona jurídica como proveedor.</span>
+        </a>
+        <a class="card" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/nuevo/natural}">
+            <span class="card__title">Crear proveedor natural</span><span class="card__description">Registrar una persona natural como proveedor.</span>
         </a>
         <a class="card" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/buscar}">
             <span class="card__title">Buscar por documento</span><span class="card__description">Consultar identidad y validar duplicados.</span>

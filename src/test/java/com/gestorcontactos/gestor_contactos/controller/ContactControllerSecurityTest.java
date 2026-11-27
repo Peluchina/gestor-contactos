@@ -1,6 +1,7 @@
 package com.gestorcontactos.gestor_contactos.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -18,19 +19,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gestorcontactos.gestor_contactos.config.SecurityConfig;
 import com.gestorcontactos.gestor_contactos.dto.CreateLegalContactRequest;
 import com.gestorcontactos.gestor_contactos.dto.CreateNaturalContactRequest;
+import com.gestorcontactos.gestor_contactos.dto.CreateContactEmailRequest;
+import com.gestorcontactos.gestor_contactos.dto.CreateContactPhoneRequest;
 import com.gestorcontactos.gestor_contactos.dto.EditContactRequest;
 import com.gestorcontactos.gestor_contactos.entity.CommercialType;
 import com.gestorcontactos.gestor_contactos.entity.Contact;
 import com.gestorcontactos.gestor_contactos.entity.ContactStatus;
 import com.gestorcontactos.gestor_contactos.entity.DocumentType;
 import com.gestorcontactos.gestor_contactos.entity.PersonType;
+import com.gestorcontactos.gestor_contactos.entity.PhoneType;
 import com.gestorcontactos.gestor_contactos.entity.Role;
 import com.gestorcontactos.gestor_contactos.entity.User;
+import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
+import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetails;
 import com.gestorcontactos.gestor_contactos.security.CustomUserDetailsService;
 import com.gestorcontactos.gestor_contactos.service.ContactService;
 import com.gestorcontactos.gestor_contactos.service.ContactPhotoStorageService;
 import com.gestorcontactos.gestor_contactos.service.UserService;
+import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +50,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentCaptor.forClass;
 
-@WebMvcTest(ContactController.class)
+@WebMvcTest(controllers = {ContactController.class, DashboardController.class})
 @Import(SecurityConfig.class)
 class ContactControllerSecurityTest {
 
@@ -75,6 +82,11 @@ class ContactControllerSecurityTest {
         mockNaturalCreation(admin, Set.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR));
         mockLegalCreation(admin, Set.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR));
 
+        assertCreationFormDefaults("/contactos/nuevo/natural", admin, Set.of(CommercialType.CLIENTE),
+                List.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR));
+        assertCreationFormDefaults("/contactos/nuevo/juridica", admin, Set.of(CommercialType.PROVEEDOR),
+                List.of(CommercialType.CLIENTE, CommercialType.PROVEEDOR));
+
         mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(admin))).with(csrf())
                         .params(validNaturalParameters()).param("commercialTypes", "CLIENTE", "PROVEEDOR"))
                 .andExpect(status().is3xxRedirection());
@@ -87,19 +99,25 @@ class ContactControllerSecurityTest {
     }
 
     @Test
-    void sellerCanCreateClientButCannotCreateSupplier() throws Exception {
+    void sellerCanCreateNaturalAndLegalClients() throws Exception {
         User seller = actor("seller", Role.VENDEDOR);
         mockNaturalCreation(seller, Set.of(CommercialType.CLIENTE));
+        mockLegalCreation(seller, Set.of(CommercialType.CLIENTE));
+
+        assertCreationFormDefaults("/contactos/nuevo/natural", seller, Set.of(CommercialType.CLIENTE),
+                List.of(CommercialType.CLIENTE));
+        assertCreationFormDefaults("/contactos/nuevo/juridica", seller, Set.of(CommercialType.CLIENTE),
+                List.of(CommercialType.CLIENTE));
 
         mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(seller))).with(csrf())
                         .params(validNaturalParameters()).param("commercialTypes", "CLIENTE"))
                 .andExpect(status().is3xxRedirection());
         mockMvc.perform(post("/contactos/juridica").with(user(new CustomUserDetails(seller))).with(csrf())
-                        .params(validLegalParameters()).param("commercialTypes", "PROVEEDOR"))
-                .andExpect(status().isForbidden());
+                        .params(validLegalParameters()).param("commercialTypes", "CLIENTE"))
+                .andExpect(status().is3xxRedirection());
 
         verify(contactService).createNaturalContact(any(CreateNaturalContactRequest.class), eq(seller));
-        verify(contactService, never()).createLegalContact(any(CreateLegalContactRequest.class), any(User.class));
+        verify(contactService).createLegalContact(any(CreateLegalContactRequest.class), eq(seller));
     }
 
     @Test
@@ -124,19 +142,69 @@ class ContactControllerSecurityTest {
     }
 
     @Test
-    void purchasingCanCreateSupplierButCannotCreateClient() throws Exception {
+    void purchasingCanCreateNaturalAndLegalSuppliers() throws Exception {
         User buyer = actor("buyer", Role.COMPRAS);
+        mockNaturalCreation(buyer, Set.of(CommercialType.PROVEEDOR));
         mockLegalCreation(buyer, Set.of(CommercialType.PROVEEDOR));
+
+        assertCreationFormDefaults("/contactos/nuevo/natural", buyer, Set.of(CommercialType.PROVEEDOR),
+                List.of(CommercialType.PROVEEDOR));
+        assertCreationFormDefaults("/contactos/nuevo/juridica", buyer, Set.of(CommercialType.PROVEEDOR),
+                List.of(CommercialType.PROVEEDOR));
+
+        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(buyer))).with(csrf())
+                        .params(validNaturalParameters()).param("commercialTypes", "PROVEEDOR"))
+                .andExpect(status().is3xxRedirection());
 
         mockMvc.perform(post("/contactos/juridica").with(user(new CustomUserDetails(buyer))).with(csrf())
                         .params(validLegalParameters()).param("commercialTypes", "PROVEEDOR"))
                 .andExpect(status().is3xxRedirection());
-        mockMvc.perform(post("/contactos/natural").with(user(new CustomUserDetails(buyer))).with(csrf())
-                        .params(validNaturalParameters()).param("commercialTypes", "CLIENTE"))
-                .andExpect(status().isForbidden());
 
+        verify(contactService).createNaturalContact(any(CreateNaturalContactRequest.class), eq(buyer));
         verify(contactService).createLegalContact(any(CreateLegalContactRequest.class), eq(buyer));
-        verify(contactService, never()).createNaturalContact(any(CreateNaturalContactRequest.class), any(User.class));
+    }
+
+    @Test
+    void dashboardAndContactListShowBothCreationOptionsForSellerAndPurchasingRoles() throws Exception {
+        User seller = actor("seller-create-options", Role.VENDEDOR);
+        mockNaturalCreation(seller, Set.of(CommercialType.CLIENTE));
+        mockMvc.perform(get("/dashboard").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear cliente natural")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear cliente jurídico")));
+        mockMvc.perform(get("/contactos").with(user(new CustomUserDetails(seller))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear cliente natural")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear cliente jurídico")));
+
+        User buyer = actor("buyer-create-options", Role.COMPRAS);
+        mockNaturalCreation(buyer, Set.of(CommercialType.PROVEEDOR));
+        mockMvc.perform(get("/dashboard").with(user(new CustomUserDetails(buyer))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear proveedor natural")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear proveedor jurídico")));
+        mockMvc.perform(get("/contactos").with(user(new CustomUserDetails(buyer))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear proveedor natural")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Crear proveedor jurídico")));
+    }
+
+    @Test
+    void commercialRoleRestrictionsRemainEnforcedByTheContactServiceForBothPersonTypes() {
+        ContactService roleEnforcingService = new ContactService(
+                org.mockito.Mockito.mock(ContactRepository.class), new ContactValidator(),
+                org.mockito.Mockito.mock(ContactPhotoStorageService.class));
+        User seller = actor("seller-role-guard", Role.VENDEDOR);
+        User buyer = actor("buyer-role-guard", Role.COMPRAS);
+
+        assertThrows(ContactBusinessException.class,
+                () -> roleEnforcingService.createNaturalContact(naturalRequest(Set.of(CommercialType.PROVEEDOR)), seller));
+        assertThrows(ContactBusinessException.class,
+                () -> roleEnforcingService.createLegalContact(legalRequest(Set.of(CommercialType.PROVEEDOR)), seller));
+        assertThrows(ContactBusinessException.class,
+                () -> roleEnforcingService.createNaturalContact(naturalRequest(Set.of(CommercialType.CLIENTE)), buyer));
+        assertThrows(ContactBusinessException.class,
+                () -> roleEnforcingService.createLegalContact(legalRequest(Set.of(CommercialType.CLIENTE)), buyer));
     }
 
     @Test
@@ -635,6 +703,35 @@ class ContactControllerSecurityTest {
                     assertEquals(commercialTypes, request.commercialTypes());
                     return created;
                 });
+    }
+
+    private void assertCreationFormDefaults(String path, User actor, Set<CommercialType> expectedDefaults,
+            List<CommercialType> expectedOptions) throws Exception {
+        var result = mockMvc.perform(get(path).with(user(new CustomUserDetails(actor))))
+                .andExpect(status().isOk())
+                .andReturn();
+        Object form = result.getModelAndView().getModel().get("form");
+        Set<CommercialType> actualDefaults;
+        if (form instanceof CreateNaturalContactRequest naturalForm) {
+            actualDefaults = naturalForm.commercialTypes();
+        } else {
+            actualDefaults = ((CreateLegalContactRequest) form).commercialTypes();
+        }
+
+        assertEquals(expectedDefaults, actualDefaults);
+        assertEquals(expectedOptions, result.getModelAndView().getModel().get("commercialTypes"));
+    }
+
+    private CreateNaturalContactRequest naturalRequest(Set<CommercialType> commercialTypes) {
+        return new CreateNaturalContactRequest("María", "Pérez", DocumentType.DNI, "12345678", "Av. Perú 123",
+                List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "987654321")),
+                List.of(new CreateContactEmailRequest("maria@example.com")), commercialTypes);
+    }
+
+    private CreateLegalContactRequest legalRequest(Set<CommercialType> commercialTypes) {
+        return new CreateLegalContactRequest("Empresa S.A.C.", DocumentType.RUC, "20123456789", "Av. Perú 123",
+                List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "987654321")),
+                List.of(new CreateContactEmailRequest("empresa@example.com")), commercialTypes);
     }
 
     private void mockLegalCreation(User actor, Set<CommercialType> commercialTypes) {

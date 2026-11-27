@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,8 +19,12 @@
     <p th:if="${error}" class="alert alert--error" th:text="${error}" role="alert"></p>
     <div class="toolbar">
         <div class="action-row">
-            <a class="button" th:if="${canCreateNatural}" th:href="@{/contactos/nuevo/natural}">Crear persona natural</a>
-            <a class="button" th:if="${canCreateLegal}" th:href="@{/contactos/nuevo/juridica}">Crear persona jurídica</a>
+            <a class="button" th:if="${canCreateNatural}" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/natural}">Crear persona natural</a>
+            <a class="button" th:if="${canCreateNatural}" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/nuevo/natural}">Crear cliente natural</a>
+            <a class="button" th:if="${canCreateNatural}" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/nuevo/natural}">Crear proveedor natural</a>
+            <a class="button" th:if="${canCreateLegal}" sec:authorize="hasRole('ADMINISTRADOR')" th:href="@{/contactos/nuevo/juridica}">Crear persona jurídica</a>
+            <a class="button" th:if="${canCreateLegal}" sec:authorize="hasRole('VENDEDOR')" th:href="@{/contactos/nuevo/juridica}">Crear cliente jurídico</a>
+            <a class="button" th:if="${canCreateLegal}" sec:authorize="hasRole('COMPRAS')" th:href="@{/contactos/nuevo/juridica}">Crear proveedor jurídico</a>
             <a class="button button--secondary" th:if="${canSearch}" th:href="@{/contactos/buscar}">Buscar por documento</a>
             <a class="button button--secondary" th:if="${canViewDeletedContacts}" th:href="@{/contactos/eliminados}">Contactos eliminados</a>
         </div>

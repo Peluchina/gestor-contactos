@@ -80,8 +80,9 @@ public class ContactController {
             model.addAttribute("restrictedView", false);
         }
         model.addAttribute("canSearch", actor.getRole() != Role.ALMACENERO);
-        model.addAttribute("canCreateNatural", actor.getRole() == Role.ADMINISTRADOR || actor.getRole() == Role.VENDEDOR);
-        model.addAttribute("canCreateLegal", actor.getRole() == Role.ADMINISTRADOR || actor.getRole() == Role.COMPRAS);
+        boolean canCreateContacts = actor.getRole() != Role.ALMACENERO;
+        model.addAttribute("canCreateNatural", canCreateContacts);
+        model.addAttribute("canCreateLegal", canCreateContacts);
         model.addAttribute("canViewDeletedContacts", actor.getRole() == Role.ADMINISTRADOR);
         return "contacts/list";
     }
@@ -96,7 +97,7 @@ public class ContactController {
     @GetMapping("/contactos/nuevo/natural")
     public String naturalContactForm(@AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
         User actor = authenticatedUser(currentUser);
-        model.addAttribute("form", emptyNaturalRequest());
+        model.addAttribute("form", emptyNaturalRequest(actor.getRole()));
         addAllowedCommercialTypes(model, actor.getRole());
         return "contacts/create-natural";
     }
@@ -126,7 +127,7 @@ public class ContactController {
     @GetMapping("/contactos/nuevo/juridica")
     public String legalContactForm(@AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
         User actor = authenticatedUser(currentUser);
-        model.addAttribute("form", emptyLegalRequest());
+        model.addAttribute("form", emptyLegalRequest(actor.getRole()));
         addAllowedCommercialTypes(model, actor.getRole());
         return "contacts/create-legal";
     }
@@ -553,16 +554,25 @@ public class ContactController {
         model.addAttribute("commercialTypes", types);
     }
 
-    private CreateNaturalContactRequest emptyNaturalRequest() {
+    private CreateNaturalContactRequest emptyNaturalRequest(Role role) {
         return new CreateNaturalContactRequest("", "", DocumentType.DNI, "", "",
                 List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "")),
-                List.of(new CreateContactEmailRequest("")), Set.of(CommercialType.CLIENTE));
+                List.of(new CreateContactEmailRequest("")), initialCommercialTypes(role, CommercialType.CLIENTE));
     }
 
-    private CreateLegalContactRequest emptyLegalRequest() {
+    private CreateLegalContactRequest emptyLegalRequest(Role role) {
         return new CreateLegalContactRequest("", DocumentType.RUC, "", "",
                 List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "")),
-                List.of(new CreateContactEmailRequest("")), Set.of(CommercialType.PROVEEDOR));
+                List.of(new CreateContactEmailRequest("")), initialCommercialTypes(role, CommercialType.PROVEEDOR));
+    }
+
+    private Set<CommercialType> initialCommercialTypes(Role role, CommercialType administratorDefault) {
+        return switch (role) {
+            case ADMINISTRADOR -> Set.of(administratorDefault);
+            case VENDEDOR -> Set.of(CommercialType.CLIENTE);
+            case COMPRAS -> Set.of(CommercialType.PROVEEDOR);
+            case ALMACENERO -> Set.of();
+        };
     }
 
     @FunctionalInterface

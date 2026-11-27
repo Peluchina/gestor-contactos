@@ -193,7 +193,8 @@ class ContactControllerSecurityTest {
     void commercialRoleRestrictionsRemainEnforcedByTheContactServiceForBothPersonTypes() {
         ContactService roleEnforcingService = new ContactService(
                 org.mockito.Mockito.mock(ContactRepository.class), new ContactValidator(),
-                org.mockito.Mockito.mock(ContactPhotoStorageService.class));
+                org.mockito.Mockito.mock(ContactPhotoStorageService.class),
+                java.time.Clock.system(java.time.ZoneId.of("America/Lima")));
         User seller = actor("seller-role-guard", Role.VENDEDOR);
         User buyer = actor("buyer-role-guard", Role.COMPRAS);
 
@@ -644,9 +645,9 @@ class ContactControllerSecurityTest {
     void administratorCanViewDeletedContactAndOnlyRestoreActionIsAvailable() throws Exception {
         User admin = actor("admin-deleted-detail", Role.ADMINISTRADOR);
         Contact deleted = new Contact(PersonType.NATURAL, "María", "Pérez", DocumentType.DNI, "12345678",
-                "Av. Perú 123", LocalDateTime.now(), admin);
+                "Av. Perú 123", LocalDateTime.of(2026, 11, 27, 14, 30), admin);
         setEntityId(deleted, 84L);
-        deleted.setDeletedAt(LocalDateTime.now());
+        deleted.setDeletedAt(LocalDateTime.of(2026, 11, 27, 14, 30));
         deleted.setDeletedBy(admin);
         when(contactService.findById(84L)).thenReturn(Optional.of(deleted));
 
@@ -655,6 +656,7 @@ class ContactControllerSecurityTest {
                 .andExpect(view().name("contacts/detail"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Contacto eliminado lógicamente.")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Auditoría")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("27/11/2026 14:30")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("admin-deleted-detail")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/contactos/84/recuperar")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")))

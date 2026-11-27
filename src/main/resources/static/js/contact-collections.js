@@ -67,8 +67,8 @@ function updatePhoneRow(row, clearValues = false) {
     areaField.disabled = isCell;
     areaField.required = !isCell;
     areaField.inputMode = "numeric";
-    areaField.maxLength = 5;
-    areaField.pattern = "[0-9]{1,5}";
+    areaField.maxLength = 3;
+    areaField.pattern = "[0-9]{2,3}";
     if (isCell) {
         areaField.value = "";
         areaField.setCustomValidity("");
@@ -77,10 +77,10 @@ function updatePhoneRow(row, clearValues = false) {
         areaField.removeAttribute("aria-invalid");
         areaFeedback.classList.remove("is-valid", "is-invalid");
     } else {
-        const areaValid = /^[0-9]{1,5}$/.test(areaField.value);
+        const areaValid = /^[0-9]{2,3}$/.test(areaField.value);
         const showAreaFeedback = row.dataset.phoneTouched === "true" || areaField.value.length > 0;
         setFeedback(areaField, areaFeedback, areaValid,
-            "El código de área es obligatorio y debe contener solo dígitos.", showAreaFeedback);
+            "El código de área debe contener 2 o 3 dígitos.", showAreaFeedback);
     }
 
     numberField.inputMode = "numeric";
@@ -119,11 +119,11 @@ function validatePhoneForm(form, showFeedback = false) {
     rows.forEach((row) => {
         const numberValid = validatePhoneNumber(row, showFeedback);
         const areaField = row.querySelector("[data-phone-area]");
-        const areaValid = !areaField || areaField.disabled || /^[0-9]{1,5}$/.test(areaField.value);
+        const areaValid = !areaField || areaField.disabled || /^[0-9]{2,3}$/.test(areaField.value);
         if (areaField && !areaField.disabled) {
             const feedback = row.querySelector("[data-phone-area-feedback]");
             setFeedback(areaField, feedback, areaValid,
-                "El código de área es obligatorio y debe contener solo dígitos.",
+                "El código de área debe contener 2 o 3 dígitos.",
                 showFeedback || areaField.value.length > 0);
         }
         valid = numberValid && areaValid && valid;

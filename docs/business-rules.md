@@ -441,12 +441,11 @@ No se debe almacenar el código de país `+51` dentro del número nacional.
 
 Los teléfonos fijos deben manejar:
 
-- código de área;
-- número local.
+- código de área numérico de 2 o 3 dígitos;
+- número local numérico de exactamente 7 dígitos.
 
 El código de área y el número local deben almacenarse separadamente.
-
-El sistema no debe asumir una única longitud de número local para todas las provincias del Perú.
+No se almacena `+51` como parte del número nacional.
 
 ## BR-27 — Duplicidad de teléfonos
 

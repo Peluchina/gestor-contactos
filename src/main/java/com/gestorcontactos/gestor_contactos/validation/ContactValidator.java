@@ -61,7 +61,7 @@ public class ContactValidator {
             throw new ContactBusinessException("Los datos del contacto son obligatorios.");
         }
         CreateLegalContactRequest normalized = new CreateLegalContactRequest(
-                request.legalName(),
+                normalizeSpaces(request.legalName()),
                 request.documentType(),
                 request.documentNumber(),
                 normalizeSpaces(request.address()),
@@ -167,9 +167,9 @@ public class ContactValidator {
                     throw new ContactBusinessException("El celular debe contener 9 dígitos y comenzar con 9.");
                 }
             } else if (phone.phoneType() == PhoneType.FIJO) {
-                if (!areaCode.matches("[0-9]{1,5}") || !phone.phoneNumber().matches("[0-9]{1,9}")) {
+                if (!areaCode.matches("[0-9]{2,3}") || !phone.phoneNumber().matches("[0-9]{7}")) {
                     throw new ContactBusinessException(
-                            "El teléfono fijo debe separar un código de área y un número local válidos.");
+                            "El teléfono fijo debe tener un código de área de 2 o 3 dígitos y un número local de 7 dígitos.");
                 }
             }
             String key = phone.phoneType() + "|" + areaCode + "|" + phone.phoneNumber();

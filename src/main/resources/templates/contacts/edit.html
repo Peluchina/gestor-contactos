@@ -83,10 +83,10 @@
                 <div class="phone-area-field" data-phone-area-field>
                     <label th:for="${'phone-area-' + phone.id}">Código de área</label>
                     <input class="phone-input" type="text" th:id="${'phone-area-' + phone.id}"
-                           name="areaCode" data-phone-area inputmode="numeric" maxlength="5" pattern="[0-9]{1,5}"
+                           name="areaCode" data-phone-area inputmode="numeric" maxlength="3" pattern="[0-9]{2,3}"
                            th:value="${phone.areaCode}"
                            th:attr="aria-describedby=${'phone-area-help-' + phone.id + ' phone-area-feedback-' + phone.id}">
-                    <p class="phone-field-help" th:id="${'phone-area-help-' + phone.id}">Para teléfono fijo, ingresa el código de área usando solo dígitos.</p>
+                    <p class="phone-field-help" th:id="${'phone-area-help-' + phone.id}">Para teléfono fijo, ingresa 2 o 3 dígitos.</p>
                     <p class="phone-field-feedback" th:id="${'phone-area-feedback-' + phone.id}"
                        data-phone-area-feedback aria-live="polite" role="status"></p>
                 </div>
@@ -117,9 +117,9 @@
             <div class="phone-area-field" data-phone-area-field>
                 <label for="phone-area-new">Código de área</label>
                 <input class="phone-input" id="phone-area-new" type="text" th:field="*{areaCode}"
-                       data-phone-area inputmode="numeric" maxlength="5" pattern="[0-9]{1,5}"
+                       data-phone-area inputmode="numeric" maxlength="3" pattern="[0-9]{2,3}"
                        aria-describedby="phone-area-help-new phone-area-feedback-new">
-                <p class="phone-field-help" id="phone-area-help-new">Para teléfono fijo, ingresa el código de área usando solo dígitos.</p>
+                <p class="phone-field-help" id="phone-area-help-new">Para teléfono fijo, ingresa 2 o 3 dígitos.</p>
                 <p class="phone-field-feedback" id="phone-area-feedback-new" data-phone-area-feedback
                    aria-live="polite" role="status"></p>
             </div>

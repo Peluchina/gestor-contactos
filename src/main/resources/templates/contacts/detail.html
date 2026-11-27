@@ -61,9 +61,9 @@
         <section class="detail-section" th:if="${isAdministrator}" aria-labelledby="audit-title">
             <h2 id="audit-title">Auditoría</h2>
             <dl class="detail-list">
-                <dt>Creado</dt><dd><time th:text="${createdAt}"></time> por <span th:text="${createdBy}"></span></dd>
-                <th:block th:if="${updatedAt}"><dt>Actualizado</dt><dd><time th:text="${updatedAt}"></time> por <span th:text="${updatedBy}"></span></dd></th:block>
-                <th:block th:if="${deletedAt}"><dt>Eliminado</dt><dd><time th:text="${deletedAt}"></time> por <span th:text="${deletedBy}"></span></dd></th:block>
+                <dt>Creado</dt><dd><time th:text="${#temporals.format(createdAt, 'dd/MM/yyyy HH:mm')}"></time> por <span th:text="${createdBy}"></span></dd>
+                <th:block th:if="${updatedAt}"><dt>Actualizado</dt><dd><time th:text="${#temporals.format(updatedAt, 'dd/MM/yyyy HH:mm')}"></time> por <span th:text="${updatedBy}"></span></dd></th:block>
+                <th:block th:if="${deletedAt}"><dt>Eliminado</dt><dd><time th:text="${#temporals.format(deletedAt, 'dd/MM/yyyy HH:mm')}"></time> por <span th:text="${deletedBy}"></span></dd></th:block>
             </dl>
         </section>
         <form th:if="${canAddClient and !clientAlreadyAssigned}"

@@ -34,7 +34,7 @@ public class ContactPhone {
     @Column(name = "phone_type", nullable = false, length = 10)
     private PhoneType phoneType;
 
-    @Column(name = "area_code", nullable = false, length = 5)
+    @Column(name = "area_code", nullable = false, length = 3)
     private String areaCode;
 
     @Column(name = "phone_number", nullable = false, length = 9)

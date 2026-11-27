@@ -28,6 +28,9 @@ import com.gestorcontactos.gestor_contactos.exception.ContactBusinessException;
 import com.gestorcontactos.gestor_contactos.repository.ContactRepository;
 import com.gestorcontactos.gestor_contactos.validation.ContactValidator;
 import java.time.LocalDateTime;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
@@ -53,7 +56,8 @@ class ContactServiceTest {
 
     @BeforeEach
     void setUp() {
-        contactService = new ContactService(contactRepository, new ContactValidator(), photoStorageService);
+        contactService = new ContactService(contactRepository, new ContactValidator(), photoStorageService,
+                Clock.fixed(Instant.parse("2026-11-27T19:30:00Z"), ZoneId.of("UTC")));
         administrator = user(Role.ADMINISTRADOR);
     }
 
@@ -70,7 +74,7 @@ class ContactServiceTest {
         assertEquals("Núñez Ríos", contact.getLastNames());
         assertEquals("Av. Perú 123", contact.getAddress());
         assertEquals("maria@example.com", contact.getEmails().get(0).getEmail());
-        assertNotNull(contact.getCreatedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), contact.getCreatedAt());
         verify(contactRepository).saveAndFlush(contact);
     }
 
@@ -78,14 +82,16 @@ class ContactServiceTest {
     void createsValidLegalPerson() {
         stubSave();
         allowNewIdentity(DocumentType.RUC, "20123456789");
-        Contact contact = contactService.createLegalContact(legalRequest("Comercial Los Andes S.A.C.",
+        Contact contact = contactService.createLegalContact(legalRequest("   Empresa     ABC   S.A.C.   ",
                 DocumentType.RUC, "20123456789", "Jr. Los Álamos 245", List.of(mobile()),
                 List.of(email("info@example.com")), Set.of(CommercialType.PROVEEDOR)), administrator);
 
         assertEquals(PersonType.JURIDICA, contact.getPersonType());
-        assertEquals("Comercial Los Andes S.A.C.", contact.getLegalName());
+        assertEquals("Empresa ABC S.A.C.", contact.getLegalName());
         assertEquals(DocumentType.RUC, contact.getDocumentType());
         assertEquals(ContactStatus.ACTIVO, contact.getStatus());
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), contact.getCreatedAt());
+        verify(contactRepository).saveAndFlush(contact);
     }
 
     @Test
@@ -156,6 +162,30 @@ class ContactServiceTest {
                 "María", "Pérez", DocumentType.DNI, "12345678", "Av. Perú 123",
                 List.of(new CreateContactPhoneRequest(PhoneType.CELULAR, "", "98765432")),
                 List.of(email("valid@example.com")), Set.of(CommercialType.CLIENTE)), administrator));
+    }
+
+    @Test
+    void validatesFixedPhoneAreaAndLocalNumberLengths() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        prepareContactForUpdate(120L, contact);
+
+        contactService.addPhone(120L, new ContactPhoneRequest(PhoneType.FIJO, "01", "1234567"), administrator);
+        contactService.addPhone(120L, new ContactPhoneRequest(PhoneType.FIJO, "054", "7654321"), administrator);
+
+        for (ContactPhoneRequest invalid : List.of(
+                new ContactPhoneRequest(PhoneType.FIJO, "1", "1234567"),
+                new ContactPhoneRequest(PhoneType.FIJO, "0123", "1234567"),
+                new ContactPhoneRequest(PhoneType.FIJO, "01", "123456"),
+                new ContactPhoneRequest(PhoneType.FIJO, "01", "12345678"),
+                new ContactPhoneRequest(PhoneType.FIJO, "0A", "1234567"),
+                new ContactPhoneRequest(PhoneType.FIJO, "01", "1234A67"))) {
+            assertThrows(ContactBusinessException.class, () -> contactService.addPhone(120L, invalid, administrator));
+        }
+
+        assertEquals("01", contact.getPhones().get(0).getAreaCode());
+        assertEquals("1234567", contact.getPhones().get(0).getPhoneNumber());
+        assertEquals("054", contact.getPhones().get(1).getAreaCode());
+        assertEquals("7654321", contact.getPhones().get(1).getPhoneNumber());
     }
 
     @Test
@@ -327,16 +357,27 @@ class ContactServiceTest {
         Contact contact = existingContactWithType(CommercialType.PROVEEDOR);
         User seller = user(Role.VENDEDOR);
         prepareContactForUpdate(contactId, contact);
-        LocalDateTime before = LocalDateTime.now();
+        LocalDateTime before = LocalDateTime.of(2026, 11, 27, 14, 29);
 
         Contact updated = contactService.addCommercialType(contactId, CommercialType.CLIENTE, seller);
 
         assertEquals("12345678", updated.getDocumentNumber());
         assertEquals(DocumentType.DNI, updated.getDocumentType());
         assertEquals(seller, updated.getUpdatedBy());
-        assertNotNull(updated.getUpdatedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), updated.getUpdatedAt());
         assertFalse(updated.getUpdatedAt().isBefore(before));
-        assertFalse(updated.getUpdatedAt().isAfter(LocalDateTime.now()));
+        assertEquals(before.plusMinutes(1), updated.getUpdatedAt());
+    }
+
+    @Test
+    void modificationAuditUsesAmericaLimaClock() {
+        Contact contact = existingContactWithType(CommercialType.CLIENTE);
+        prepareContactForUpdate(121L, contact);
+
+        Contact updated = contactService.updateEditableData(121L, new EditContactRequest("Av. Lima 500"), administrator);
+
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), updated.getUpdatedAt());
+        assertEquals(administrator, updated.getUpdatedBy());
     }
 
     @Test
@@ -384,7 +425,7 @@ class ContactServiceTest {
         inactive.setStatus(ContactStatus.INACTIVO);
         prepareContactForUpdate(101L, active);
         prepareContactForUpdate(102L, inactive);
-        LocalDateTime before = LocalDateTime.now(java.time.ZoneId.of("America/Lima"));
+        LocalDateTime before = LocalDateTime.of(2026, 11, 27, 14, 29);
 
         Contact madeInactive = contactService.changeStatus(101L, "INACTIVO", administrator);
         Contact madeActive = contactService.changeStatus(102L, "ACTIVO", administrator);
@@ -401,9 +442,8 @@ class ContactServiceTest {
         assertEquals("uploads/contacts/00000000-0000-0000-0000-000000000001.jpg", madeInactive.getPhotoPath());
         assertEquals(Set.of(CommercialType.CLIENTE), madeInactive.getCommercialTypes());
         assertEquals(administrator, madeInactive.getUpdatedBy());
-        assertNotNull(madeInactive.getUpdatedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), madeInactive.getUpdatedAt());
         assertFalse(madeInactive.getUpdatedAt().isBefore(before));
-        assertFalse(madeInactive.getUpdatedAt().isAfter(LocalDateTime.now(java.time.ZoneId.of("America/Lima"))));
         verify(contactRepository).saveAndFlush(active);
         verify(contactRepository).saveAndFlush(inactive);
     }
@@ -461,17 +501,17 @@ class ContactServiceTest {
         contact.addEmail(new com.gestorcontactos.gestor_contactos.entity.ContactEmail("contact@example.com"));
         contact.setPhotoPath("uploads/contacts/contact.jpg");
         prepareContactForUpdate(107L, contact);
-        LocalDateTime before = LocalDateTime.now(java.time.ZoneId.of("America/Lima"));
+        LocalDateTime before = LocalDateTime.of(2026, 11, 27, 14, 29);
 
         Contact deleted = contactService.softDelete(107L, administrator);
 
         assertEquals(contact, deleted);
         assertNotNull(deleted.getDeletedAt());
         assertFalse(deleted.getDeletedAt().isBefore(before));
-        assertFalse(deleted.getDeletedAt().isAfter(LocalDateTime.now(java.time.ZoneId.of("America/Lima"))));
         assertEquals(administrator, deleted.getDeletedBy());
         assertEquals(administrator, deleted.getUpdatedBy());
-        assertNotNull(deleted.getUpdatedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), deleted.getUpdatedAt());
+        assertEquals(deleted.getUpdatedAt(), deleted.getDeletedAt());
         assertEquals(ContactStatus.ACTIVO, deleted.getStatus());
         assertEquals("12345678", deleted.getDocumentNumber());
         assertEquals("Av. Perú 123", deleted.getAddress());
@@ -502,6 +542,7 @@ class ContactServiceTest {
         assertEquals(null, restored.getDeletedAt());
         assertEquals(null, restored.getDeletedBy());
         assertEquals(ContactStatus.INACTIVO, restored.getStatus());
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), restored.getUpdatedAt());
         assertEquals(administrator, restored.getUpdatedBy());
         assertNotNull(restored.getUpdatedAt());
         assertEquals("12345678", restored.getDocumentNumber());
@@ -591,7 +632,7 @@ class ContactServiceTest {
         Contact contact = existingContactWithType(CommercialType.CLIENTE);
         User seller = user(Role.VENDEDOR);
         prepareContactForUpdate(36L, contact);
-        LocalDateTime before = LocalDateTime.now(java.time.ZoneId.of("America/Lima"));
+        LocalDateTime before = LocalDateTime.of(2026, 11, 27, 14, 29);
 
         contactService.updateEditableData(36L, new EditContactRequest("Av. Nueva 456"), seller);
 
@@ -601,7 +642,7 @@ class ContactServiceTest {
         assertEquals("12345678", contact.getDocumentNumber());
         assertEquals(seller, contact.getUpdatedBy());
         assertFalse(contact.getUpdatedAt().isBefore(before));
-        assertFalse(contact.getUpdatedAt().isAfter(LocalDateTime.now(java.time.ZoneId.of("America/Lima"))));
+        assertEquals(LocalDateTime.of(2026, 11, 27, 14, 30), contact.getUpdatedAt());
     }
 
     @Test

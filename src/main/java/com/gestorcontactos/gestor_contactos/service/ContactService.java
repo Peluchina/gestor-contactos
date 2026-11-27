@@ -25,6 +25,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
@@ -36,15 +37,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ContactService {
 
+    private static final ZoneId AUDIT_ZONE = ZoneId.of("America/Lima");
+
     private final ContactRepository contactRepository;
     private final ContactValidator contactValidator;
     private final ContactPhotoStorageService photoStorageService;
+    private final Clock clock;
 
     public ContactService(ContactRepository contactRepository, ContactValidator contactValidator,
-            ContactPhotoStorageService photoStorageService) {
+            ContactPhotoStorageService photoStorageService, Clock clock) {
         this.contactRepository = contactRepository;
         this.contactValidator = contactValidator;
         this.photoStorageService = photoStorageService;
+        this.clock = clock;
     }
 
     @Transactional
@@ -64,7 +69,7 @@ public class ContactService {
             ensureIdentityIsNew(valid.documentType(), valid.documentNumber());
 
             Contact contact = new Contact(PersonType.NATURAL, valid.firstNames(), valid.lastNames(),
-                    valid.documentType(), valid.documentNumber(), valid.address(), LocalDateTime.now(), createdBy);
+                    valid.documentType(), valid.documentNumber(), valid.address(), now(), createdBy);
             contact.setPhotoPath(photoPath);
             addChildrenAndCommercialTypes(contact, valid.phones(), valid.emails(), valid.commercialTypes());
             return save(contact);
@@ -93,7 +98,7 @@ public class ContactService {
             ensureIdentityIsNew(valid.documentType(), valid.documentNumber());
 
             Contact contact = new Contact(PersonType.JURIDICA, valid.legalName(), valid.documentType(),
-                    valid.documentNumber(), valid.address(), LocalDateTime.now(), createdBy);
+                    valid.documentNumber(), valid.address(), now(), createdBy);
             contact.setPhotoPath(photoPath);
             addChildrenAndCommercialTypes(contact, valid.phones(), valid.emails(), valid.commercialTypes());
             return save(contact);
@@ -120,7 +125,7 @@ public class ContactService {
 
         contact.addCommercialType(commercialType);
         contact.setUpdatedBy(actor);
-        contact.setUpdatedAt(LocalDateTime.now());
+        contact.setUpdatedAt(now());
         try {
             return contactRepository.saveAndFlush(contact);
         } catch (DataIntegrityViolationException exception) {
@@ -167,7 +172,7 @@ public class ContactService {
         }
         requireAdministrator(actor);
 
-        LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Lima"));
+        LocalDateTime now = now();
         contact.setDeletedAt(now);
         contact.setDeletedBy(actor);
         return saveModified(contact, actor, now);
@@ -182,7 +187,7 @@ public class ContactService {
         }
         requireAdministrator(actor);
 
-        LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Lima"));
+        LocalDateTime now = now();
         contact.setDeletedAt(null);
         contact.setDeletedBy(null);
         contact.setStatus(ContactStatus.INACTIVO);
@@ -407,7 +412,11 @@ public class ContactService {
     }
 
     private Contact saveModified(Contact contact, User actor) {
-        return saveModified(contact, actor, LocalDateTime.now(ZoneId.of("America/Lima")));
+        return saveModified(contact, actor, now());
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock.withZone(AUDIT_ZONE));
     }
 
     private Contact saveModified(Contact contact, User actor, LocalDateTime updatedAt) {

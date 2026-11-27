@@ -63,10 +63,10 @@
                     <div class="phone-area-field" data-phone-area-field>
                         <label th:for="${'phone-area-' + item.index}">Código de área</label>
                         <input class="phone-input" type="text" th:id="${'phone-area-' + item.index}"
-                               data-phone-area inputmode="numeric" maxlength="5" pattern="[0-9]{1,5}"
+                               data-phone-area inputmode="numeric" maxlength="3" pattern="[0-9]{2,3}"
                                th:name="${'phones[' + item.index + '].areaCode'}" th:value="${phone.areaCode}"
                                th:attr="aria-describedby=${'phone-area-help-' + item.index + ' phone-area-feedback-' + item.index}">
-                        <p class="phone-field-help" th:id="${'phone-area-help-' + item.index}">Para teléfono fijo, ingresa el código de área usando solo dígitos.</p>
+                        <p class="phone-field-help" th:id="${'phone-area-help-' + item.index}">Para teléfono fijo, ingresa 2 o 3 dígitos.</p>
                         <p class="phone-field-feedback" th:id="${'phone-area-feedback-' + item.index}"
                            data-phone-area-feedback aria-live="polite" role="status"></p>
                     </div>

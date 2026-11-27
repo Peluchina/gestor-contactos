@@ -64,7 +64,8 @@ class ContactPhotoStorageServiceTest {
     void setUp() {
         photoValidator = new ContactPhotoValidator();
         storageService = new ContactPhotoStorageService(photoValidator, tempDirectory);
-        contactService = new ContactService(contactRepository, new ContactValidator(), storageService);
+        contactService = new ContactService(contactRepository, new ContactValidator(), storageService,
+                java.time.Clock.system(java.time.ZoneId.of("America/Lima")));
         administrator = user("admin", Role.ADMINISTRADOR);
     }
 

@@ -341,8 +341,8 @@ Permite registrar múltiples teléfonos para un contacto.
 | `id` | BIGINT | NO | Identificador |
 | `contact_id` | BIGINT | NO | Contacto asociado |
 | `phone_type` | VARCHAR(10) | NO | Tipo de teléfono |
-| `area_code` | VARCHAR(5) | NO | Código de área |
-| `phone_number` | VARCHAR(9) | NO | Número telefónico |
+| `area_code` | VARCHAR(3) | NO | Código de área; vacío para celular y de 2 o 3 dígitos para fijo |
+| `phone_number` | VARCHAR(9) | NO | Número telefónico; 9 dígitos para celular o 7 para fijo |
 
 ### Tipos
 
@@ -389,6 +389,8 @@ Se almacenan separadamente:
 area_code
 phone_number
 ```
+
+El código de área debe contener 2 o 3 dígitos y el número local exactamente 7 dígitos. Ambos campos deben ser numéricos.
 
 Ejemplo:
 
